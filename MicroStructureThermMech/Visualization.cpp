@@ -4,7 +4,7 @@
 #include <stdexcept>   // std::runtime_error
 #include <iostream>
 
-namespace Visualization {
+namespace msGen {
 
     namespace {
         // 辅助函数: 将 val 从区间 [inMin, inMax] 线性映射到 [0, 255]。
