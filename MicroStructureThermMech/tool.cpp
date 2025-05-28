@@ -529,6 +529,13 @@ MatrixXd homogenize_therm(
     int nel = nelx * nely;
     MatrixXd keLambda, keMu, feLambda, feMu;
     elementMatVec(dx / 2, dy / 2, phi, keLambda, keMu, feLambda, feMu);
+    for (int i = 0; i < keMu.rows(); i += 2) {      // 遍历奇数行（MATLAB索引1:2:end对应C++索引0,2,4...）
+        for (int j = 0; j < keMu.cols(); j += 2) {  // 遍历奇数列
+            if (i + 1 < keMu.rows() && j + 1 < keMu.cols()) { // 防止越界访问
+                keMu(i, j) += keMu(i + 1, j + 1);       // 偶位置元素累加到奇位置
+            }
+        }
+    }
     // Node numbers and element degrees of freedom for full (not periodic) mesh
     //nodenrs = reshape(1:(1+nelx)*(1+nely),1+nely,1+nelx);
     MatrixXi nodenrs(nely + 1, nelx + 1);
