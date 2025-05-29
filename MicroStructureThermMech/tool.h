@@ -24,6 +24,12 @@ MatrixXd homogenize(int lx, int ly,
     double phi, 
     MatrixXi x);
 
+MatrixXd homogenize_therm(int lx, int ly,
+    std::vector<double> lambda,
+    std::vector<double> mu,
+    double phi,
+    MatrixXi x);
+
 void elementMatVec(double a,
     double b,
     double phi,
@@ -32,4 +38,14 @@ void elementMatVec(double a,
     MatrixXd& feLambda,
     MatrixXd& feMu);
 
+void elementMatVec_therm(double a,
+    double b,
+    double phi,
+    MatrixXd& keLambda,
+    MatrixXd& keMu,
+    MatrixXd& feLambda,
+    MatrixXd& feMu);
+
 MatrixXi image2matrix(string filename);
+
+void showSparseMatrix(SparseMatrix<double> X);

@@ -1,21 +1,23 @@
-#include "tool.h"
+ï»¿#include "tool.h"
 
 MatrixXi image2matrix(string filename)
 {
     cv::Mat grayImage = cv::imread(filename, cv::IMREAD_GRAYSCALE);
+    cv::imshow("grayImage", grayImage);
+    
     if (grayImage.empty()) {
         std::cerr << "Error: Could not read image " << filename << std::endl;
         return Eigen::MatrixXi(0, 0);
     }
 
-    // ¶şÖµ»¯´¦Àí (ãĞÖµ150£¬¶ÔÓ¦MATLABµÄim2bwÂß¼­)
+    // äºŒå€¼åŒ–å¤„ç† (é˜ˆå€¼150ï¼Œå¯¹åº”MATLABçš„im2bwé€»è¾‘)
     cv::Mat binaryImage;
     cv::threshold(grayImage, binaryImage, 149, 1, cv::THRESH_BINARY); // <150 -> 0, >=150 -> 1
 
-    // °´MATLAB´úÂëÒªÇó +1£¨¿ÉÑ¡£©
-    binaryImage += 1;  // ½«0/1×ªÎª1/2
+    // æŒ‰MATLABä»£ç è¦æ±‚ +1ï¼ˆå¯é€‰ï¼‰
+    binaryImage += 1;  // å°†0/1è½¬ä¸º1/2
 
-    // ×ª»»ÎªEigen MatrixXi
+    // è½¬æ¢ä¸ºEigen MatrixXi
     Eigen::MatrixXi result(binaryImage.rows, binaryImage.cols);
     for (int i = 0; i < binaryImage.rows; ++i) {
         for (int j = 0; j < binaryImage.cols; ++j) {
@@ -31,101 +33,92 @@ MatrixXd homogenize(
 {
     //INITIALIZE
     // Deduce discretization
-//    int nely = x.rows(), nelx = x.cols();
-//    // Stiffness matrix consists of two parts, one belonging to lambda and
-//    // one belonging to mu. Same goes for load vector
-//    double dx = (double)lx / nelx, dy = (double)ly / nely;
-//    int nel = nelx * nely;
-//    MatrixXd keLambda, keMu, feLambda, feMu;
-//    elementMatVec(dx / 2, dy / 2, phi, keLambda, keMu, feLambda, feMu);
-//
-//    // Node numbers and element degrees of freedom for full (not periodic) mesh
-//    //nodenrs = reshape(1:(1+nelx)*(1+nely),1+nely,1+nelx);
-//    MatrixXi nodenrs(nely + 1, nelx + 1);
-//    for (int i = 0, c = 1; i <= nelx; ++i) {
-//        for (int j = 0; j <= nely; ++j) {
-//            nodenrs(j, i) = c++;
-//        }
-//    }
-//    //edofVec = reshape(2 * nodenrs(1:end - 1, 1 : end - 1) + 1, nel, 1);
-//    VectorXi edofVec(nel);
-//    for (int i = 0, c = 0; i < nelx; ++i) {
-//        for (int j = 0; j < nely; ++j) {
-//            edofVec(c) = 2 * nodenrs(j, i) + 1;
-//            c++;
-//        }
-//    }
-//    //edofMat = repmat(edofVec, 1, 8) + repmat([0 1 2 * nely + [2 3 0 1] - 2 - 1], nel, 1);
-//    MatrixXi edofMat(nel, 8);
-//    edofMat.col(0) = edofVec;
-//    edofMat.col(1) = edofVec.array() + 1;
-//    edofMat.col(2) = edofVec.array() + 2 * nely + 2;
-//    edofMat.col(3) = edofVec.array() + 2 * nely + 3;
-//    edofMat.col(4) = edofVec.array() + 2 * nely;
-//    edofMat.col(5) = edofVec.array() + 2 * nely + 1;
-//    edofMat.col(6) = edofVec.array() - 2;
-//    edofMat.col(7) = edofVec.array() - 1;
-//
-//    //--------------------------Test----------------------------------------
-//    //std::cout << "keLambda:\n" << keLambda << "++++++++++++++++++++++\n";
-//    //std::cout << "keMu:\n" << keMu << "++++++++++++++++++++++\n";
-//    //std::cout << "feLambda:\n" << feLambda << "++++++++++++++++++++++\n";
-//    //std::cout << "feMu:\n" << feMu << "++++++++++++++++++++++\n";
-//
-//    //std::cout << "nodenrs:\n" << nodenrs << "++++++++++++++++++++++\n";
-//    //std::cout << "edofVec:\n" << edofVec << "++++++++++++++++++++++\n";
-//    //std::cout << "edofMat:\n" << edofMat << "++++++++++++++++++++++\n";
-//    //----------------------------------------------------------------------
-//    //IMPOSE PERIODIC BOUNDARY CONDITIONS
-//    //Use original edofMat to index into list with the periodic dofs
-//    int nn = (nelx + 1) * (nely + 1); // Total number of nodes
-//    int nnP = nelx * nely;            // Total number of unique nodes
-//    Eigen::MatrixXi nnPArray(nely + 1, nelx + 1);
-//    nnPArray.setZero();
-//    for (int i = 0; i < nely; i++)
-//        for (int j = 0; j < nelx; j++)
-//            nnPArray(i, j) = i * nelx + j + 1;
-//    // Extend with a mirror of the top border
-//    for (int j = 0; j < nelx + 1; j++) {
-//        nnPArray(nely, j) = nnPArray(0, j);
-//    }
-//    // Extend with a mirror of the left border
-//    for (int i = 0; i < nely + 1; i++) {
-//        nnPArray(i, nelx) = nnPArray(i, 0);
-//    }
-//
-//    Eigen::VectorXd nnParrayVector(nn);
-//    int indexOfnnParrayVector = 0;
-//    for (int i = 0; i <= nelx; i++) {
-//        for (int j = 0; j <= nely; j++) {
-//            nnParrayVector(indexOfnnParrayVector++) = nnPArray(j, i);
-//        }
-//    }
-//
-//    Eigen::VectorXd dofVector(2 * nn);
-//    dofVector.setZero();
-//
-//    for (int i = 0; i < nn; i++) {
-//        dofVector(i * 2) = 2 * nnParrayVector(i) - 1;
-//        dofVector(i * 2 + 1) = 2 * nnParrayVector(i);
-//    }
-//
-//    //for (int i = 0; i <= nely; i++)
-//    //{
-//    //	for (int j = 0; j <= nelx; j++)
-//    //	{
-//    //		int p = i * nelx + nelx - j;
-//    //		dofVector(2 * p) = 2 * (nnPArray(j, i)) - 1;
-//    //		dofVector(2 * p + 1) = 2 * (nnPArray(j, i));
-//    //	}
-//    //}
-//
-//    Eigen::MatrixXi edofMatNew(nel, 8);
-//    for (int i = 0; i < nel; i++)
-//        for (int j = 0; j < 8; j++)
-//            edofMatNew(i, j) = dofVector(edofMat(i, j) - 1);
-//    edofMat = edofMatNew;
-//    int ndof = 2 * nnP; // Number of dofs
+    int nely = x.rows(), nelx = x.cols();
+    // Stiffness matrix consists of two parts, one belonging to lambda and
+    // one belonging to mu. Same goes for load vector
+    double dx = (double)lx / nelx, dy = (double)ly / nely;
+    int nel = nelx * nely;
+    MatrixXd keLambda, keMu, feLambda, feMu;
+    elementMatVec(dx / 2, dy / 2, phi, keLambda, keMu, feLambda, feMu);
+
+    // Node numbers and element degrees of freedom for full (not periodic) mesh
+    //nodenrs = reshape(1:(1+nelx)*(1+nely),1+nely,1+nelx);
+    MatrixXi nodenrs(nely + 1, nelx + 1);
+    for (int i = 0, c = 1; i <= nelx; ++i) {
+        for (int j = 0; j <= nely; ++j) {
+            nodenrs(j, i) = c++;
+        }
+    }
+    //edofVec = reshape(2 * nodenrs(1:end - 1, 1 : end - 1) + 1, nel, 1);
+    VectorXi edofVec(nel);
+    for (int i = 0, c = 0; i < nelx; ++i) {
+        for (int j = 0; j < nely; ++j) {
+            edofVec(c) = 2 * nodenrs(j, i) + 1;
+            c++;
+        }
+    }
+    //edofMat = repmat(edofVec, 1, 8) + repmat([0 1 2 * nely + [2 3 0 1] - 2 - 1], nel, 1);
+    MatrixXi edofMat(nel, 8);
+    edofMat.col(0) = edofVec;
+    edofMat.col(1) = edofVec.array() + 1;
+    edofMat.col(2) = edofVec.array() + 2 * nely + 2;
+    edofMat.col(3) = edofVec.array() + 2 * nely + 3;
+    edofMat.col(4) = edofVec.array() + 2 * nely;
+    edofMat.col(5) = edofVec.array() + 2 * nely + 1;
+    edofMat.col(6) = edofVec.array() - 2;
+    edofMat.col(7) = edofVec.array() - 1;
+    //cout << edofMat << endl;
+    //--------------------------Test----------------------------------------
+    //std::cout << "keLambda:\n" << keLambda << "++++++++++++++++++++++\n";
+    //std::cout << "keMu:\n" << keMu << "++++++++++++++++++++++\n";
+    //std::cout << "feLambda:\n" << feLambda << "++++++++++++++++++++++\n";
+    //std::cout << "feMu:\n" << feMu << "++++++++++++++++++++++\n";
+
+    //std::cout << "nodenrs:\n" << nodenrs << "++++++++++++++++++++++\n";
+    //std::cout << "edofVec:\n" << edofVec << "++++++++++++++++++++++\n";
+    //std::cout << "edofMat:\n" << edofMat << "++++++++++++++++++++++\n";
+    //----------------------------------------------------------------------
+    //IMPOSE PERIODIC BOUNDARY CONDITIONS
+    //Use original edofMat to index into list with the periodic dofs
+    int nn = (nelx + 1) * (nely + 1); // Total number of nodes
+    int nnP = nelx * nely;            // Total number of unique nodes
+    Eigen::MatrixXi nnPArray(nely + 1, nelx + 1);
+    nnPArray.setZero();
+    for (int i = 0; i < nely; i++)
+        for (int j = 0; j < nelx; j++)
+            nnPArray(j, i) = i * nelx + j + 1;
+    // Extend with a mirror of the top border
+    for (int j = 0; j < nelx + 1; j++) {
+        nnPArray(nely, j) = nnPArray(0, j);
+    }
+    // Extend with a mirror of the left border
+    for (int i = 0; i < nely + 1; i++) {
+        nnPArray(i, nelx) = nnPArray(i, 0);
+    }
+
+    //cout << "nnPArray:" << nnPArray << endl;
+    Eigen::VectorXd nnParrayVector(nn);
+    int indexOfnnParrayVector = 0;
+    for (int i = 0; i <= nelx; i++) {
+        for (int j = 0; j <= nely; j++) {
+            nnParrayVector(indexOfnnParrayVector++) = nnPArray(j, i);
+        }
+    }
+
+    Eigen::VectorXd dofVector(2 * nn);
+    dofVector.setZero();
+
+    for (int i = 0; i < nn; i++) {
+        dofVector(i * 2) = 2 * nnParrayVector(i) - 1;
+        dofVector(i * 2 + 1) = 2 * nnParrayVector(i);
+    }
+
+    Eigen::MatrixXi edofMatNew(nel, 8);
+    for (int i = 0; i < nel; i++)
+        for (int j = 0; j < 8; j++)
+            edofMatNew(i, j) = dofVector(edofMat(i, j) - 1);
+    edofMat = edofMatNew;
+    int ndof = 2 * nnP; // Number of dofs
 //
 //    //--------------------------Test----------------------------------------
 //    //std::cout << "nnPArray:\n" << nnPArray << "++++++++++++++++++++++\n";
@@ -140,706 +133,283 @@ MatrixXd homogenize(
 //
 //    // ASSEMBLE STIFFNESS MATRIX
 //    // Indexing vectors
-//    //Eigen::MatrixXi iK = Eigen::Map<Eigen::MatrixXi>(edofMat.data(), edofMat.size(), 1).replicate(1, 8).transpose();
-//    //Eigen::MatrixXi jK = Eigen::Map<Eigen::MatrixXi>(edofMat.data(), edofMat.size(), 1).replicate(8, 1);
-//
-//    Eigen::MatrixXi iKones = Eigen::MatrixXi::Ones(8, 1);
-//    Eigen::MatrixXi iK = Eigen::kroneckerProduct(edofMat, iKones).transpose();
-//
-//    Eigen::MatrixXi jKones = Eigen::MatrixXi::Ones(1, 8);
-//    Eigen::MatrixXi jK = Eigen::kroneckerProduct(edofMat, jKones).transpose();
-//
-//    //std::cout << "iK:\n" << iK << "++++++++++++++++++++++\n";
-//    //std::cout << "jK:\n" << jK << "++++++++++++++++++++++\n";
-//
-//    // Material properties in the different elements
-//    Eigen::VectorXd lambdaOfx(nel);
-//    Eigen::VectorXd muOfx(nel);
-//    for (int i = 0; i < nel; i++) {
-//        if (x(i) == 1) {
-//            lambdaOfx(i) = lambda[0];
-//            muOfx(i) = mu[0];
-//        }
-//        else if (x(i) == 2) {
-//            lambdaOfx(i) = lambda[1];
-//            muOfx(i) = mu[1];
-//        }
-//    }
-//    // The corresponding stiffness matrix entries
-//    Eigen::VectorXd keLambdaVector(keLambda.rows() * keLambda.cols());
-//    Eigen::VectorXd keMuVector(keMu.rows() * keMu.cols());
-//    int indexOfkeLambdaVector = 0;
-//    for (int i = 0; i < keLambda.cols(); i++) {
-//        for (int j = 0; j < keLambda.rows(); j++) {
-//            keLambdaVector(indexOfkeLambdaVector++) = keLambda(j, i);
-//        }
-//    }
-//    int indexOfkeMuVector = 0;
-//    for (int i = 0; i < keMu.cols(); i++) {
-//        for (int j = 0; j < keMu.rows(); j++) {
-//            keMuVector(indexOfkeMuVector++) = keMu(j, i);
-//        }
-//    }
-//    Eigen::MatrixXd sK = (keLambdaVector * lambdaOfx.transpose() + keMuVector * muOfx.transpose());
-//
-//    //std::cout << "sK:\n" << sK << "++++++++++++++++++++++\n";
-//
-//    //std::cout << iK.rows() * iK.cols() << "   ===    " << jK.rows() * jK.cols() << "  ===  " << sK.rows() * sK.cols() << '\n';
-//
-//    //MatrixXf M1(3, 3);    // Column-major storage
-//    //M1 << 1, 2, 3,
-//    //	4, 5, 6,
-//    //	7, 8, 9;
-//
-//    //Map<RowVectorXf> v1(M1.data(), M1.size());
-//    //cout << "v1:" << endl << v1 << endl;
-//
-//    //Matrix<float, Dynamic, Dynamic, RowMajor> M2(M1);
-//    //Map<RowVectorXf> v2(M2.data(), M2.size());
-//    //cout << "v2:" << endl << v2 << endl;
-//
-//    Map<VectorXi> iKVector(iK.data(), iK.size());
-//    Map<VectorXi> jKVector(jK.data(), jK.size());
-//    Map<VectorXd> sKVector(sK.data(), sK.size());
-//
-//    Eigen::SparseMatrix<double> K = Eigen::SparseMatrix<double>(ndof, ndof);
-//    //// Fill K with triplets
-//    std::vector<Eigen::Triplet<double>> triplets;
-//    for (int i = 0; i < iK.size(); ++i) {
-//        triplets.emplace_back(iKVector(i) - 1, jKVector(i) - 1, sKVector(i));
-//    }
-//    K.setFromTriplets(triplets.begin(), triplets.end());
-//
-//    //--------------------------Test----------------------------------------
-//    //----------------------------------------------------------------------
-//
-//    //std::cout << "K:\n" << MatrixXd(K) << "++++++++++++++++++++++\n";
-//
-//    // ĞèÒª×ªÖÃÂğ£¿
-//
-//    //----------------------------------------------------------------------
-//    //----------------------------------------------------------------------
-//    //LOAD VECTORS AND SOLUTION
-//    Eigen::VectorXd feLambdaVector(feLambda.rows() * feLambda.cols());
-//    Eigen::VectorXd feMuVector(feMu.rows() * feMu.cols());
-//    int indexOffeLambdaVector = 0;
-//    for (int i = 0; i < feLambda.cols(); i++) {
-//        for (int j = 0; j < feLambda.rows(); j++) {
-//            feLambdaVector(indexOffeLambdaVector++) = feLambda(j, i);
-//        }
-//    }
-//    int indexOffeMuVector = 0;
-//    for (int i = 0; i < feMu.cols(); i++) {
-//        for (int j = 0; j < feMu.rows(); j++) {
-//            feMuVector(indexOffeMuVector++) = feMu(j, i);
-//        }
-//    }
-//
-//    Eigen::MatrixXd sF = (feLambdaVector * lambdaOfx.transpose() + feMuVector * muOfx.transpose());
-//    //std::cout << "feLambdaVector:\n" << feLambdaVector << "++++++++++++++++++++++\n";
-//    //std::cout << "feMuVector:\n" << feMuVector << "++++++++++++++++++++++\n";
-//    //std::cout << "sF:\n" << sF << "++++++++++++++++++++++\n";
-//
-//    //			//nel * 8
-//    Eigen::MatrixXi iF(24, nel);
-//    Eigen::MatrixXi edofMatT = edofMat.transpose();
-//    iF.block(0, 0, edofMatT.rows(), edofMatT.cols()) = edofMatT;
-//    iF.block(edofMatT.rows(), 0, edofMatT.rows(), edofMatT.cols()) = edofMatT;
-//    iF.block(edofMatT.rows() * 2, 0, edofMatT.rows(), edofMatT.cols()) = edofMatT;
-//
-//    Eigen::MatrixXi jF(24, nel);
-//    Eigen::MatrixXi jFzeros = Eigen::MatrixXi::Ones(8, nel);
-//    jF.block(0, 0, jFzeros.rows(), jFzeros.cols()) = jFzeros;
-//    jF.block(jFzeros.rows(), 0, jFzeros.rows(), jFzeros.cols()) = jFzeros * 2;
-//    jF.block(jFzeros.rows() * 2, 0, jFzeros.rows(), jFzeros.cols()) = jFzeros * 3;
-//
-//    Map<VectorXi> iFVector(iF.data(), iF.size());
-//    Map<VectorXi> jFVector(jF.data(), jF.size());
-//    Map<VectorXd> sFVector(sF.data(), sF.size());
-//
-//    Eigen::SparseMatrix<double> F(ndof, 3);
-//
-//    std::vector<Eigen::Triplet<double>> triplets2;
-//    for (int i = 0; i < iF.size(); ++i) {
-//        triplets2.emplace_back(iFVector(i) - 1, jFVector(i) - 1, sFVector(i));
-//    }
-//    F.setFromTriplets(triplets2.begin(), triplets2.end());
-//
-//    // Solve (remember to constrain one node)
-//    //Eigen::SparseMatrix<double> chi(ndof, 3);
-//    //Eigen::SparseMatrix<double> K_block = K.block(2, 2, ndof - 2, ndof - 2);
-//    //chi.block(2, 0, ndof - 2, 3) = K_block.llt().solve(F.block(2, 0, ndof - 2, 3));
-//
-//    SparseLU<SparseMatrix<double>> solver;
-//    solver.compute(K.transpose().block(2, 2,  ndof - 2, ndof - 2)); // Çó½âKÖĞ3µ½ndofµÄ²¿·Ö£¬×¢ÒâÒªÈ¥³ı±ß½çÉÏµÄ×ÔÓÉ¶È
-//    //solver.compute(K.block(2, 2, ndof - 2, ndof - 2)); // Çó½âKÖĞ3µ½ndofµÄ²¿·Ö£¬×¢ÒâÒªÈ¥³ı±ß½çÉÏµÄ×ÔÓÉ¶È
-//
-//    SparseMatrix<double> chi;
-//
-//    //chi = solver.solve(F.block(2, 0, ndof - 2, 3)); // Çó½âÏßĞÔ·½³Ì×é
-//    Eigen::MatrixXd X = solver.solve(F.block(2, 0, ndof - 2, 3)); // Çó½âÏßĞÔ·½³Ì×é
-//    chi.block(2, 0, ndof - 2, 3) = X;
-//    //std::cout << chi << '\n';
-//
-////HOMOGENIZATION
-////×¢ÒâÎÊÌâ  matlabµÄÏÂ±ê¿ÉÄÜÓëEigen²»Í¬
-//
-//    Eigen::MatrixXd chi0[3];
-//    chi0[0] = Eigen::MatrixXd(nel, 8);
-//    chi0[0].setZero();
-//    chi0[1] = Eigen::MatrixXd(nel, 8);
-//    chi0[1].setZero();
-//    chi0[2] = Eigen::MatrixXd(nel, 8);
-//    chi0[2].setZero();
-//
-//    Eigen::MatrixXd chi0_e = Eigen::MatrixXd(8, 3);
-//    chi0_e.setZero();
-//    Eigen::MatrixXd ke = keMu + keLambda;
-//    Eigen::MatrixXd fe = feMu + feLambda;
-//
-//    MatrixXd ke3_5end_3_5end(ke.rows() - 3, ke.cols() - 3);
-//    for (int i = 0; i < ke3_5end_3_5end.rows(); i++) {
-//        for (int j = 0; j < ke3_5end_3_5end.cols(); j++) {
-//            int indexi = i;
-//            int indexj = j;
-//            if (i == 0)
-//                indexi = 2;
-//            else
-//                indexi = i + 3;
-//            if (j == 0)
-//                indexj = 2;
-//            else
-//                indexj = j + 3;
-//
-//            ke3_5end_3_5end(i, j) = ke(indexi, indexj);
-//        }
-//    }
-//    MatrixXd fe3_5end(fe.rows() - 3, fe.cols());
-//    for (int i = 0; i < fe3_5end.rows(); i++) {
-//        int indexi = i;
-//        if (i == 0)
-//            indexi = 2;
-//        else
-//            indexi = i + 3;
-//
-//        fe3_5end.row(i) = fe.row(indexi);
-//    }
-//
-//    //std::cout << "ke3_5end_3_5end:\n" << ke3_5end_3_5end << "++++++++++++++++++++++\n";
-//    //std::cout << "fe3_5end\n" << fe3_5end << "++++++++++++++++++++++\n";
-//
-//    MatrixXd ke3_5cfe3_5 = ke3_5end_3_5end.inverse() * fe3_5end;
-//
-//    for (int i = 0; i < ke3_5cfe3_5.rows(); i++) {
-//        int indexi = i;
-//        if (i == 0)
-//            indexi = 2;
-//        else
-//            indexi = i + 3;
-//
-//        chi0_e.row(indexi) = ke3_5cfe3_5.row(i);
-//    }
-//
-//    //std::cout << "chi0_e\n" << chi0_e << "++++++++++++++++++++++\n";
-//
-//    VectorXd chi0_e_1 = chi0_e.col(0);
-//    VectorXd chi0_e_2 = chi0_e.col(1);
-//    VectorXd chi0_e_3 = chi0_e.col(2);
-//
-//    VectorXd epsilonones = VectorXd::Ones(nel);
-//
-//    chi0[0] = Eigen::kroneckerProduct(chi0_e_1.transpose(), epsilonones);
-//    chi0[1] = Eigen::kroneckerProduct(chi0_e_2.transpose(), epsilonones);
-//    chi0[2] = Eigen::kroneckerProduct(chi0_e_3.transpose(), epsilonones);
-//
-//    //std::cout << "chi0[0]:\n" << chi0[0] << "++++++++++++++++++++++\n";
-//    //std::cout << "chi0[1]:\n" << chi0[1] << "++++++++++++++++++++++\n";
-//    //std::cout << "chi0[2]:\n" << chi0[2] << "++++++++++++++++++++++\n";
-//
-//    //std::cout << "chi0_e1:\n" << chi0_e_1 << "++++++++++++++++++++++\n";
-//    //std::cout << "chi0_e2:\n" << chi0_e_2 << "++++++++++++++++++++++\n";
-//    //std::cout << "chi0_e3:\n" << chi0_e_3 << "++++++++++++++++++++++\n";
-//
-//    Eigen::MatrixXd CH = Eigen::MatrixXd::Zero(3, 3);
-//    double cellVolume = lx * ly;
-//    Eigen::MatrixXd chiMatrix(chi);
-//
-//    Eigen::MatrixXd chiMatrix2(chiMatrix.rows() + 2, chiMatrix.cols());
-//    chiMatrix2.row(0) = VectorXd::Zero(chiMatrix.cols());
-//    chiMatrix2.row(1) = VectorXd::Zero(chiMatrix.cols());
-//    chiMatrix2.block(2, 0, chiMatrix.rows(), chiMatrix.cols()) = chiMatrix;
-//
-//    //std::cout << "chiMatrix:\n" << chiMatrix2 << "++++++++++++++++++++++\n";
-//
-//    Map<VectorXd> chiVector(chiMatrix2.data(), chiMatrix2.size());
-//
-//    for (int i = 0; i < 3; i++) {
-//        for (int j = 0; j < 3; j++) {
-//            Eigen::MatrixXd chiP1(edofMat.rows(), edofMat.cols());
-//            for (int indexx = 0; indexx < chiP1.rows(); indexx++) {
-//                for (int indexy = 0; indexy < chiP1.cols(); indexy++) {
-//                    chiP1(indexx, indexy) = chiVector(edofMat(indexx, indexy) + i * ndof - 1);
-//                }
-//            }
-//            Eigen::MatrixXd chiP2(edofMat.rows(), edofMat.cols());
-//            for (int indexx = 0; indexx < chiP1.rows(); indexx++) {
-//                for (int indexy = 0; indexy < chiP1.cols(); indexy++) {
-//                    chiP2(indexx, indexy) = chiVector(edofMat(indexx, indexy) + j * ndof - 1);
-//                }
-//            }
-//
-//            //std::cout << "chiP1:\n" << chiP1 << "++++++++++++++++++++++\n";
-//            //std::cout << "Chi0:\n" << chi0[i] << "++++++++++++++++++++++\n";
-//            //std::cout << "keLambda:\n" << keLambda << "++++++++++++++++++++++\n";
-//
-//            MatrixXd sumLambdaMult1 = (chi0[i] - chiP1) * keLambda;
-//            MatrixXd sumLambdaMult2 = chi0[j] - chiP2;
-//            //std::cout << "sumLambdaMult1:\n" << sumLambdaMult1 << "++++++++++++++++++++++\n";
-//            //std::cout << "sumLambdaMult2:\n" << sumLambdaMult2 << "++++++++++++++++++++++\n";
-//
-//            MatrixXd sumLambdaT = ((sumLambdaMult1).cwiseProduct(sumLambdaMult2));
-//            MatrixXd sumMuT = (((chi0[i] - chiP1) * keMu).cwiseProduct(chi0[j] - chiP2));
-//
-//            //std::cout << "sumLambdaT:\n" << sumLambdaT << "++++++++++++++++++++++\n";
-//
-//            VectorXd sumLambdaRowsum = sumLambdaT.rowwise().sum();
-//            VectorXd sumMuRowsum = sumMuT.rowwise().sum();
-//
-//            //std::cout << "sumLambdaRowWise:\n" << sumLambdaRowsum << "++++++++++++++++++++++\n";
-//
-//            //VectorXd m;
-//            //m << 1, 2, 3, 4, 5, 6, 7, 8, 9;
-//            //Matrix3d A = Map<Matrix3d>(m.data())
-//
-//            MatrixXd sumLambda = Map<MatrixXd>(sumLambdaRowsum.data(), nely, nelx);
-//            MatrixXd sumMu = Map<MatrixXd>(sumMuRowsum.data(), nely, nelx);
-//
-//            MatrixXd LambdaMatrix = Map<MatrixXd>(lambdaOfx.data(), nely, nelx);
-//            MatrixXd MuMatrix = Map<MatrixXd>(muOfx.data(), nely, nelx);
-//
-//            //std::cout << "sumLambda:\n" << sumLambda << "++++++++++++++++++++++\n";
-//            //std::cout << "LambdaMatrix:\n" << LambdaMatrix << "++++++++++++++++++++++\n";
-//
-//            //std::cout << "LambdaVec.*sumLambda:\n" << LambdaMatrix.cwiseProduct(sumLambda) << "+++++++++++++++++++\n";
-//            //std::cout << "MuVec.*sumMu:\n" << MuMatrix.cwiseProduct(sumMu) << "+++++++++++++++++++\n";
-//
-//            CH(i, j) = 1.0 / cellVolume
-//                * (LambdaMatrix.cwiseProduct(sumLambda) + MuMatrix.cwiseProduct(sumMu)).sum();
-//        }
-//    }
 
-    //std::cout << "CH:\n" << CH << "++++++++++++++++++++++\n";
-//INITIALIZE
-    // Deduce discretization
-int nely = x.rows(), nelx = x.cols();
-// Stiffness matrix consists of two parts, one belonging to lambda and
-// one belonging to mu. Same goes for load vector
-double dx = (double)lx / nelx, dy = (double)ly / nely;
-int nel = nelx * nely;
-MatrixXd keLambda, keMu, feLambda, feMu;
-elementMatVec(dx / 2, dy / 2, phi, keLambda, keMu, feLambda, feMu);
-// Node numbers and element degrees of freedom for full (not periodic) mesh
-MatrixXi nodenrs(nely + 1, nelx + 1);
-for (int i = 0, c = 1; i <= nelx; ++i) {
-    for (int j = 0; j <= nely; ++j) {
-        nodenrs(j, i) = c++;
+    Eigen::MatrixXi iKones = Eigen::MatrixXi::Ones(8, 1);
+    Eigen::MatrixXi iK = Eigen::kroneckerProduct(edofMat, iKones).transpose();
+
+    Eigen::MatrixXi jKones = Eigen::MatrixXi::Ones(1, 8);
+    Eigen::MatrixXi jK = Eigen::kroneckerProduct(edofMat, jKones).transpose();
+
+    //std::cout << "iK:\n" << iK << "++++++++++++++++++++++\n";
+    //std::cout << "jK:\n" << jK << "++++++++++++++++++++++\n";
+
+    // Material properties in the different elements
+    Eigen::VectorXd lambdaOfx(nel);
+    Eigen::VectorXd muOfx(nel);
+    for (int i = 0; i < nel; i++) {
+        if (x(i) == 1) {
+            lambdaOfx(i) = lambda[0];
+            muOfx(i) = mu[0];
+        }
+        else if (x(i) == 2) {
+            lambdaOfx(i) = lambda[1];
+            muOfx(i) = mu[1];
+        }
     }
-}
-
-VectorXi edofVec(nel);
-for (int i = 0, c = 0; i < nelx; ++i) {
-    for (int j = 0; j < nely; ++j) {
-        edofVec(c) = 2 * nodenrs(j, i) + 1;
-        c++;
+    // The corresponding stiffness matrix entries
+    Eigen::VectorXd keLambdaVector(keLambda.rows() * keLambda.cols());
+    Eigen::VectorXd keMuVector(keMu.rows() * keMu.cols());
+    int indexOfkeLambdaVector = 0;
+    for (int i = 0; i < keLambda.cols(); i++) {
+        for (int j = 0; j < keLambda.rows(); j++) {
+            keLambdaVector(indexOfkeLambdaVector++) = keLambda(j, i);
+        }
     }
-}
-
-MatrixXi edofMat(nel, 8);
-edofMat.col(0) = edofVec;
-edofMat.col(1) = edofVec.array() + 1;
-edofMat.col(2) = edofVec.array() + 2 * nely + 2;
-edofMat.col(3) = edofVec.array() + 2 * nely + 3;
-edofMat.col(4) = edofVec.array() + 2 * nely;
-edofMat.col(5) = edofVec.array() + 2 * nely + 1;
-edofMat.col(6) = edofVec.array() - 2;
-edofMat.col(7) = edofVec.array() - 1;
-
-//--------------------------Test----------------------------------------
-//----------------------------------------------------------------------
-//std::cout << "keLambda:\n" << keLambda << "++++++++++++++++++++++\n";
-//std::cout << "keMu:\n" << keMu << "++++++++++++++++++++++\n";
-//std::cout << "feLambda:\n" << feLambda << "++++++++++++++++++++++\n";
-//std::cout << "feMu:\n" << feMu << "++++++++++++++++++++++\n";
-
-//std::cout << "nodenrs:\n" << nodenrs << "++++++++++++++++++++++\n";
-//std::cout << "edofVec:\n" << edofVec << "++++++++++++++++++++++\n";
-//std::cout << "edofMat:\n" << edofMat << "++++++++++++++++++++++\n";
-//----------------------------------------------------------------------
-//----------------------------------------------------------------------
-//IMPOSE PERIODIC BOUNDARY CONDITIONS
-//Use original edofMat to index into list with the periodic dofs
-int nn = (nelx + 1) * (nely + 1); // Total number of nodes
-int nnP = nelx * nely;            // Total number of unique nodes
-Eigen::MatrixXi nnPArray(nely + 1, nelx + 1);
-nnPArray.setZero();
-for (int i = 0; i < nely; i++)
-    for (int j = 0; j < nelx; j++)
-        nnPArray(i, j) = i * nelx + j + 1;
-// Extend with a mirror of the top border
-for (int j = 0; j < nelx + 1; j++) {
-    nnPArray(nely, j) = nnPArray(0, j);
-}
-// Extend with a mirror of the left border
-for (int i = 0; i < nely + 1; i++) {
-    nnPArray(i, nelx) = nnPArray(i, 0);
-}
-
-Eigen::VectorXd nnParrayVector(nn);
-int indexOfnnParrayVector = 0;
-for (int i = 0; i <= nelx; i++) {
-    for (int j = 0; j <= nely; j++) {
-        nnParrayVector(indexOfnnParrayVector++) = nnPArray(j, i);
+    int indexOfkeMuVector = 0;
+    for (int i = 0; i < keMu.cols(); i++) {
+        for (int j = 0; j < keMu.rows(); j++) {
+            keMuVector(indexOfkeMuVector++) = keMu(j, i);
+        }
     }
-}
+    Eigen::MatrixXd sK = (keLambdaVector * lambdaOfx.transpose() + keMuVector * muOfx.transpose());
 
-Eigen::VectorXd dofVector(2 * nn);
-dofVector.setZero();
+    //std::cout << "sK:\n" << sK << "++++++++++++++++++++++\n";
 
-for (int i = 0; i < nn; i++) {
-    dofVector(i * 2) = 2 * nnParrayVector(i) - 1;
-    dofVector(i * 2 + 1) = 2 * nnParrayVector(i);
-}
+    //std::cout << iK.rows() * iK.cols() << "   ===    " << jK.rows() * jK.cols() << "  ===  " << sK.rows() * sK.cols() << '\n';
+    //Map<RowVectorXf> v1(M1.data(), M1.size());
+    //cout << "v1:" << endl << v1 << endl;
 
-//for (int i = 0; i <= nely; i++)
-//{
-//	for (int j = 0; j <= nelx; j++)
-//	{
-//		int p = i * nelx + nelx - j;
-//		dofVector(2 * p) = 2 * (nnPArray(j, i)) - 1;
-//		dofVector(2 * p + 1) = 2 * (nnPArray(j, i));
-//	}
-//}
+    //Matrix<float, Dynamic, Dynamic, RowMajor> M2(M1);
+    //Map<RowVectorXf> v2(M2.data(), M2.size());
+    //cout << "v2:" << endl << v2 << endl;
 
-Eigen::MatrixXi edofMatNew(nel, 8);
-for (int i = 0; i < nel; i++)
-    for (int j = 0; j < 8; j++)
-        edofMatNew(i, j) = dofVector(edofMat(i, j) - 1);
-edofMat = edofMatNew;
-int ndof = 2 * nnP; // Number of dofs
+    Map<VectorXi> iKVector(iK.data(), iK.size());
+    Map<VectorXi> jKVector(jK.data(), jK.size());
+    Map<VectorXd> sKVector(sK.data(), sK.size());
 
-//--------------------------Test----------------------------------------
-//----------------------------------------------------------------------
-//std::cout << "nnPArray:\n" << nnPArray << "++++++++++++++++++++++\n";
-//std::cout << "nnParrayVector:\n" << nnParrayVector << "++++++++++++++++++++++\n";
-//std::cout << "dofVector:\n" << dofVector << "++++++++++++++++++++++\n";
-//std::cout << "edofMat:\n" << edofMat << "++++++++++++++++++++++\n";
-
-//std::cout << "feMu:\n" << feMu << "++++++++++++++++++++++\n";
-
-//std::cout << "nodenrs:\n" << nodenrs << "++++++++++++++++++++++\n";
-//std::cout << "edofVec:\n" << edofVec << "++++++++++++++++++++++\n";
-//std::cout << "edofMat:\n" << edofMat << "++++++++++++++++++++++\n";
-//----------------------------------------------------------------------
-//----------------------------------------------------------------------
-
-// ASSEMBLE STIFFNESS MATRIX
-// Indexing vectors
-//Eigen::MatrixXi iK = Eigen::Map<Eigen::MatrixXi>(edofMat.data(), edofMat.size(), 1).replicate(1, 8).transpose();
-//Eigen::MatrixXi jK = Eigen::Map<Eigen::MatrixXi>(edofMat.data(), edofMat.size(), 1).replicate(8, 1);
-
-Eigen::MatrixXi iKones = Eigen::MatrixXi::Ones(8, 1);
-Eigen::MatrixXi iK = Eigen::kroneckerProduct(edofMat, iKones).transpose();
-
-Eigen::MatrixXi jKones = Eigen::MatrixXi::Ones(1, 8);
-Eigen::MatrixXi jK = Eigen::kroneckerProduct(edofMat, jKones).transpose();
-
-//std::cout << "iK:\n" << iK << "++++++++++++++++++++++\n";
-//std::cout << "jK:\n" << jK << "++++++++++++++++++++++\n";
-
-// Material properties in the different elements
-Eigen::VectorXd lambdaOfx(nel);
-Eigen::VectorXd muOfx(nel);
-for (int i = 0; i < nel; i++) {
-    if (x(i) == 1) {
-        lambdaOfx(i) = lambda[0];
-        muOfx(i) = mu[0];
+    Eigen::SparseMatrix<double> K = Eigen::SparseMatrix<double>(ndof, ndof);
+    //// Fill K with triplets
+    std::vector<Eigen::Triplet<double>> triplets;
+    for (int i = 0; i < iK.size(); ++i) {
+        triplets.emplace_back(iKVector(i) - 1, jKVector(i) - 1, sKVector(i));
     }
-    else if (x(i) == 2) {
-        lambdaOfx(i) = lambda[1];
-        muOfx(i) = mu[1];
+    K.setFromTriplets(triplets.begin(), triplets.end());
+
+    //--------------------------Test----------------------------------------
+    //----------------------------------------------------------------------
+
+    //std::cout << "K:\n" << MatrixXd(K) << "++++++++++++++++++++++\n";
+
+    // éœ€è¦è½¬ç½®å—ï¼Ÿ
+
+    //----------------------------------------------------------------------
+    //----------------------------------------------------------------------
+    //LOAD VECTORS AND SOLUTION
+    Eigen::VectorXd feLambdaVector(feLambda.rows() * feLambda.cols());
+    Eigen::VectorXd feMuVector(feMu.rows() * feMu.cols());
+    int indexOffeLambdaVector = 0;
+    for (int i = 0; i < feLambda.cols(); i++) {
+        for (int j = 0; j < feLambda.rows(); j++) {
+            feLambdaVector(indexOffeLambdaVector++) = feLambda(j, i);
+        }
     }
-}
-// The corresponding stiffness matrix entries
-Eigen::VectorXd keLambdaVector(keLambda.rows() * keLambda.cols());
-Eigen::VectorXd keMuVector(keMu.rows() * keMu.cols());
-int indexOfkeLambdaVector = 0;
-for (int i = 0; i < keLambda.cols(); i++) {
-    for (int j = 0; j < keLambda.rows(); j++) {
-        keLambdaVector(indexOfkeLambdaVector++) = keLambda(j, i);
+    int indexOffeMuVector = 0;
+    for (int i = 0; i < feMu.cols(); i++) {
+        for (int j = 0; j < feMu.rows(); j++) {
+            feMuVector(indexOffeMuVector++) = feMu(j, i);
+        }
     }
-}
-int indexOfkeMuVector = 0;
-for (int i = 0; i < keMu.cols(); i++) {
-    for (int j = 0; j < keMu.rows(); j++) {
-        keMuVector(indexOfkeMuVector++) = keMu(j, i);
+
+    Eigen::MatrixXd sF = (feLambdaVector * lambdaOfx.transpose() + feMuVector * muOfx.transpose());
+    //std::cout << "feLambdaVector:\n" << feLambdaVector << "++++++++++++++++++++++\n";
+    //std::cout << "feMuVector:\n" << feMuVector << "++++++++++++++++++++++\n";
+    //std::cout << "sF:\n" << sF << "++++++++++++++++++++++\n";
+
+    			//nel * 8
+    Eigen::MatrixXi iF(24, nel);
+    Eigen::MatrixXi edofMatT = edofMat.transpose();
+    iF.block(0, 0, edofMatT.rows(), edofMatT.cols()) = edofMatT;
+    iF.block(edofMatT.rows(), 0, edofMatT.rows(), edofMatT.cols()) = edofMatT;
+    iF.block(edofMatT.rows() * 2, 0, edofMatT.rows(), edofMatT.cols()) = edofMatT;
+
+    Eigen::MatrixXi jF(24, nel);
+    Eigen::MatrixXi jFzeros = Eigen::MatrixXi::Ones(8, nel);
+    jF.block(0, 0, jFzeros.rows(), jFzeros.cols()) = jFzeros;
+    jF.block(jFzeros.rows(), 0, jFzeros.rows(), jFzeros.cols()) = jFzeros * 2;
+    jF.block(jFzeros.rows() * 2, 0, jFzeros.rows(), jFzeros.cols()) = jFzeros * 3;
+
+    Map<VectorXi> iFVector(iF.data(), iF.size());
+    Map<VectorXi> jFVector(jF.data(), jF.size());
+    Map<VectorXd> sFVector(sF.data(), sF.size());
+
+    Eigen::SparseMatrix<double> F(ndof, 3);
+
+    std::vector<Eigen::Triplet<double>> triplets2;
+    for (int i = 0; i < iF.size(); ++i) {
+        triplets2.emplace_back(iFVector(i) - 1, jFVector(i) - 1, sFVector(i));
     }
-}
-Eigen::MatrixXd sK = (keLambdaVector * lambdaOfx.transpose() + keMuVector * muOfx.transpose());
+    F.setFromTriplets(triplets2.begin(), triplets2.end());
 
-//std::cout << "sK:\n" << sK << "++++++++++++++++++++++\n";
+    SparseLU<SparseMatrix<double>> solver;
+    solver.compute(K.block(2, 2, ndof - 2, ndof - 2)); // æ±‚è§£Kä¸­3åˆ°ndofçš„éƒ¨åˆ†ï¼Œæ³¨æ„è¦å»é™¤è¾¹ç•Œä¸Šçš„è‡ªç”±åº¦
+    SparseMatrix<double> chi(ndof, 3);
+    chi = solver.solve(F.block(2, 0, ndof - 2, 3)); // æ±‚è§£çº¿æ€§æ–¹ç¨‹ç»„
 
-//std::cout << iK.rows() * iK.cols() << "   ===    " << jK.rows() * jK.cols() << "  ===  " << sK.rows() * sK.cols() << '\n';
+    //showSparseMatrix(K.transpose().block(2, 2, ndof - 2, ndof - 2));
+    //showSparseMatrix(X2);
+//HOMOGENIZATION
+//æ³¨æ„é—®é¢˜  matlabçš„ä¸‹æ ‡å¯èƒ½ä¸Eigenä¸åŒ
 
-//MatrixXf M1(3, 3);    // Column-major storage
-//M1 << 1, 2, 3,
-//	4, 5, 6,
-//	7, 8, 9;
+    Eigen::MatrixXd chi0[3];
+    chi0[0] = Eigen::MatrixXd(nel, 8);
+    chi0[0].setZero();
+    chi0[1] = Eigen::MatrixXd(nel, 8);
+    chi0[1].setZero();
+    chi0[2] = Eigen::MatrixXd(nel, 8);
+    chi0[2].setZero();
 
-//Map<RowVectorXf> v1(M1.data(), M1.size());
-//cout << "v1:" << endl << v1 << endl;
+    Eigen::MatrixXd chi0_e = Eigen::MatrixXd(8, 3);
+    chi0_e.setZero();
+    Eigen::MatrixXd ke = keMu + keLambda;
+    Eigen::MatrixXd fe = feMu + feLambda;
 
-//Matrix<float, Dynamic, Dynamic, RowMajor> M2(M1);
-//Map<RowVectorXf> v2(M2.data(), M2.size());
-//cout << "v2:" << endl << v2 << endl;
+    MatrixXd ke3_5end_3_5end(ke.rows() - 3, ke.cols() - 3);
+    for (int i = 0; i < ke3_5end_3_5end.rows(); i++) {
+        for (int j = 0; j < ke3_5end_3_5end.cols(); j++) {
+            int indexi = i;
+            int indexj = j;
+            if (i == 0)
+                indexi = 2;
+            else
+                indexi = i + 3;
+            if (j == 0)
+                indexj = 2;
+            else
+                indexj = j + 3;
 
-Map<VectorXi> iKVector(iK.data(), iK.size());
-Map<VectorXi> jKVector(jK.data(), jK.size());
-Map<VectorXd> sKVector(sK.data(), sK.size());
-
-Eigen::SparseMatrix<double> K = Eigen::SparseMatrix<double>(ndof, ndof);
-//// Fill K with triplets
-std::vector<Eigen::Triplet<double>> triplets;
-for (int i = 0; i < iK.size(); ++i) {
-    triplets.emplace_back(iKVector(i) - 1, jKVector(i) - 1, sKVector(i));
-}
-K.setFromTriplets(triplets.begin(), triplets.end());
-
-//--------------------------Test----------------------------------------
-//----------------------------------------------------------------------
-
-//std::cout << "K:\n" << MatrixXd(K) << "++++++++++++++++++++++\n";
-
-// ĞèÒª×ªÖÃÂğ£¿
-
-//----------------------------------------------------------------------
-//----------------------------------------------------------------------
-//LOAD VECTORS AND SOLUTION
-
-Eigen::VectorXd feLambdaVector(feLambda.rows() * feLambda.cols());
-Eigen::VectorXd feMuVector(feMu.rows() * feMu.cols());
-int indexOffeLambdaVector = 0;
-for (int i = 0; i < feLambda.cols(); i++) {
-    for (int j = 0; j < feLambda.rows(); j++) {
-        feLambdaVector(indexOffeLambdaVector++) = feLambda(j, i);
+            ke3_5end_3_5end(i, j) = ke(indexi, indexj);
+        }
     }
-}
-int indexOffeMuVector = 0;
-for (int i = 0; i < feMu.cols(); i++) {
-    for (int j = 0; j < feMu.rows(); j++) {
-        feMuVector(indexOffeMuVector++) = feMu(j, i);
-    }
-}
-
-Eigen::MatrixXd sF = (feLambdaVector * lambdaOfx.transpose() + feMuVector * muOfx.transpose());
-//std::cout << "feLambdaVector:\n" << feLambdaVector << "++++++++++++++++++++++\n";
-//std::cout << "feMuVector:\n" << feMuVector << "++++++++++++++++++++++\n";
-//std::cout << "sF:\n" << sF << "++++++++++++++++++++++\n";
-
-//			//nel * 8
-Eigen::MatrixXi iF(24, nel);
-Eigen::MatrixXi edofMatT = edofMat.transpose();
-iF.block(0, 0, edofMatT.rows(), edofMatT.cols()) = edofMatT;
-iF.block(edofMatT.rows(), 0, edofMatT.rows(), edofMatT.cols()) = edofMatT;
-iF.block(edofMatT.rows() * 2, 0, edofMatT.rows(), edofMatT.cols()) = edofMatT;
-
-//
-Eigen::MatrixXi jF(24, nel);
-Eigen::MatrixXi jFzeros = Eigen::MatrixXi::Ones(8, nel);
-jF.block(0, 0, jFzeros.rows(), jFzeros.cols()) = jFzeros;
-jF.block(jFzeros.rows(), 0, jFzeros.rows(), jFzeros.cols()) = jFzeros * 2;
-jF.block(jFzeros.rows() * 2, 0, jFzeros.rows(), jFzeros.cols()) = jFzeros * 3;
-
-Map<VectorXi> iFVector(iF.data(), iF.size());
-Map<VectorXi> jFVector(jF.data(), jF.size());
-Map<VectorXd> sFVector(sF.data(), sF.size());
-
-Eigen::SparseMatrix<double> F(ndof, 3);
-
-std::vector<Eigen::Triplet<double>> triplets2;
-for (int i = 0; i < iF.size(); ++i) {
-    triplets2.emplace_back(iFVector(i) - 1, jFVector(i) - 1, sFVector(i));
-}
-F.setFromTriplets(triplets2.begin(), triplets2.end());
-
-// Solve (remember to constrain one node)
-//Eigen::SparseMatrix<double> chi(ndof, 3);
-//Eigen::SparseMatrix<double> K_block = K.block(2, 2, ndof - 2, ndof - 2);
-//chi.block(2, 0, ndof - 2, 3) = K_block.llt().solve(F.block(2, 0, ndof - 2, 3));
-
-SparseLU<SparseMatrix<double>> solver;
-solver.compute(K.transpose().block(2,
-    2,
-    ndof - 2,
-    ndof - 2)); // Çó½âKÖĞ3µ½ndofµÄ²¿·Ö£¬×¢ÒâÒªÈ¥³ı±ß½çÉÏµÄ×ÔÓÉ¶È
-
-SparseMatrix<double> chi;
-
-chi = solver.solve(F.block(2, 0, ndof - 2, 3)); // Çó½âÏßĞÔ·½³Ì×é
-
-//std::cout << chi << '\n';
-
-//×¢ÒâÎÊÌâ  matlabµÄÏÂ±ê¿ÉÄÜÓëEigen²»Í¬
-
-Eigen::MatrixXd chi0[3];
-chi0[0] = Eigen::MatrixXd(nel, 8);
-chi0[0].setZero();
-chi0[1] = Eigen::MatrixXd(nel, 8);
-chi0[1].setZero();
-chi0[2] = Eigen::MatrixXd(nel, 8);
-chi0[2].setZero();
-
-Eigen::MatrixXd chi0_e = Eigen::MatrixXd(8, 3);
-chi0_e.setZero();
-Eigen::MatrixXd ke = keMu + keLambda;
-Eigen::MatrixXd fe = feMu + feLambda;
-
-MatrixXd ke3_5end_3_5end(ke.rows() - 3, ke.cols() - 3);
-for (int i = 0; i < ke3_5end_3_5end.rows(); i++) {
-    for (int j = 0; j < ke3_5end_3_5end.cols(); j++) {
+    MatrixXd fe3_5end(fe.rows() - 3, fe.cols());
+    for (int i = 0; i < fe3_5end.rows(); i++) {
         int indexi = i;
-        int indexj = j;
         if (i == 0)
             indexi = 2;
         else
             indexi = i + 3;
 
-        if (j == 0)
-            indexj = 2;
+        fe3_5end.row(i) = fe.row(indexi);
+    }
+
+   /* std::cout << "ke3_5end_3_5end:\n" << ke3_5end_3_5end << "++++++++++++++++++++++\n";
+    std::cout << "fe3_5end\n" << fe3_5end << "++++++++++++++++++++++\n";*/
+
+    MatrixXd ke3_5cfe3_5 = ke3_5end_3_5end.inverse() * fe3_5end;
+
+    for (int i = 0; i < ke3_5cfe3_5.rows(); i++) {
+        int indexi = i;
+        if (i == 0)
+            indexi = 2;
         else
-            indexj = j + 3;
+            indexi = i + 3;
 
-        ke3_5end_3_5end(i, j) = ke(indexi, indexj);
+        chi0_e.row(indexi) = ke3_5cfe3_5.row(i);
     }
-}
-MatrixXd fe3_5end(fe.rows() - 3, fe.cols());
-for (int i = 0; i < fe3_5end.rows(); i++) {
-    int indexi = i;
-    if (i == 0)
-        indexi = 2;
-    else
-        indexi = i + 3;
 
-    fe3_5end.row(i) = fe.row(indexi);
-}
+    //std::cout << "chi0_e\n" << chi0_e << "++++++++++++++++++++++\n";
 
-//std::cout << "ke3_5end_3_5end:\n" << ke3_5end_3_5end << "++++++++++++++++++++++\n";
-//std::cout << "fe3_5end\n" << fe3_5end << "++++++++++++++++++++++\n";
+    VectorXd chi0_e_1 = chi0_e.col(0);
+    VectorXd chi0_e_2 = chi0_e.col(1);
+    VectorXd chi0_e_3 = chi0_e.col(2);
 
-MatrixXd ke3_5cfe3_5 = ke3_5end_3_5end.inverse() * fe3_5end;
+    VectorXd epsilonones = VectorXd::Ones(nel);
 
-for (int i = 0; i < ke3_5cfe3_5.rows(); i++) {
-    int indexi = i;
-    if (i == 0)
-        indexi = 2;
-    else
-        indexi = i + 3;
+    chi0[0] = Eigen::kroneckerProduct(chi0_e_1.transpose(), epsilonones);
+    chi0[1] = Eigen::kroneckerProduct(chi0_e_2.transpose(), epsilonones);
+    chi0[2] = Eigen::kroneckerProduct(chi0_e_3.transpose(), epsilonones);
 
-    chi0_e.row(indexi) = ke3_5cfe3_5.row(i);
-}
+    //std::cout << "chi0[0]:\n" << chi0[0] << "++++++++++++++++++++++\n";
+    //std::cout << "chi0[1]:\n" << chi0[1] << "++++++++++++++++++++++\n";
+    //std::cout << "chi0[2]:\n" << chi0[2] << "++++++++++++++++++++++\n";
 
-//std::cout << "chi0_e\n" << chi0_e << "++++++++++++++++++++++\n";
+    //std::cout << "chi0_e1:\n" << chi0_e_1 << "++++++++++++++++++++++\n";
+    //std::cout << "chi0_e2:\n" << chi0_e_2 << "++++++++++++++++++++++\n";
+    //std::cout << "chi0_e3:\n" << chi0_e_3 << "++++++++++++++++++++++\n";
 
-VectorXd chi0_e_1 = chi0_e.col(0);
-VectorXd chi0_e_2 = chi0_e.col(1);
-VectorXd chi0_e_3 = chi0_e.col(2);
+    Eigen::MatrixXd CH = Eigen::MatrixXd::Zero(3, 3);
+    double cellVolume = lx * ly;
+    Eigen::MatrixXd chiMatrix(chi);
 
-VectorXd epsilonones = VectorXd::Ones(nel);
+    Eigen::MatrixXd chiMatrix2(chiMatrix.rows() + 2, chiMatrix.cols());
+    chiMatrix2.row(0) = VectorXd::Zero(chiMatrix.cols());
+    chiMatrix2.row(1) = VectorXd::Zero(chiMatrix.cols());
+    chiMatrix2.block(2, 0, chiMatrix.rows(), chiMatrix.cols()) = chiMatrix;
 
-chi0[0] = Eigen::kroneckerProduct(chi0_e_1.transpose(), epsilonones);
-chi0[1] = Eigen::kroneckerProduct(chi0_e_2.transpose(), epsilonones);
-chi0[2] = Eigen::kroneckerProduct(chi0_e_3.transpose(), epsilonones);
+    //std::cout << "chiMatrix:\n" << chiMatrix2 << "++++++++++++++++++++++\n";
 
-//std::cout << "chi0[0]:\n" << chi0[0] << "++++++++++++++++++++++\n";
-//std::cout << "chi0[1]:\n" << chi0[1] << "++++++++++++++++++++++\n";
-//std::cout << "chi0[2]:\n" << chi0[2] << "++++++++++++++++++++++\n";
+    Map<VectorXd> chiVector(chiMatrix2.data(), chiMatrix2.size());
 
-//std::cout << "chi0_e1:\n" << chi0_e_1 << "++++++++++++++++++++++\n";
-//std::cout << "chi0_e2:\n" << chi0_e_2 << "++++++++++++++++++++++\n";
-//std::cout << "chi0_e3:\n" << chi0_e_3 << "++++++++++++++++++++++\n";
-
-Eigen::MatrixXd CH = Eigen::MatrixXd::Zero(3, 3);
-double cellVolume = lx * ly;
-
-//Eigen::MatrixXd chi_edofMat(ndof * 8, 3);
-//for (int i = 0; i < 8; i++) {
-//	chi_edofMat.block(i*ndof, 0, ndof, 3) = chi.block(edofMat + (i*ndof), 0, ndof, 3);
-//}
-
-Eigen::MatrixXd chiMatrix(chi);
-
-Eigen::MatrixXd chiMatrix2(chiMatrix.rows() + 2, chiMatrix.cols());
-chiMatrix2.row(0) = VectorXd::Zero(chiMatrix.cols());
-chiMatrix2.row(1) = VectorXd::Zero(chiMatrix.cols());
-chiMatrix2.block(2, 0, chiMatrix.rows(), chiMatrix.cols()) = chiMatrix;
-
-//std::cout << "chiMatrix:\n" << chiMatrix2 << "++++++++++++++++++++++\n";
-
-Map<VectorXd> chiVector(chiMatrix2.data(), chiMatrix2.size());
-
-for (int i = 0; i < 3; i++) {
-    for (int j = 0; j < 3; j++) {
-        Eigen::MatrixXd chiP1(edofMat.rows(), edofMat.cols());
-        for (int indexx = 0; indexx < chiP1.rows(); indexx++) {
-            for (int indexy = 0; indexy < chiP1.cols(); indexy++) {
-                chiP1(indexx, indexy) = chiVector(edofMat(indexx, indexy) + i * ndof - 1);
+    for (int i = 0; i < 3; i++) {
+        for (int j = 0; j < 3; j++) {
+            Eigen::MatrixXd chiP1(edofMat.rows(), edofMat.cols());
+            for (int indexx = 0; indexx < chiP1.rows(); indexx++) {
+                for (int indexy = 0; indexy < chiP1.cols(); indexy++) {
+                    chiP1(indexx, indexy) = chiVector(edofMat(indexx, indexy) + i * ndof - 1);
+                }
             }
-        }
-        Eigen::MatrixXd chiP2(edofMat.rows(), edofMat.cols());
-        for (int indexx = 0; indexx < chiP1.rows(); indexx++) {
-            for (int indexy = 0; indexy < chiP1.cols(); indexy++) {
-                chiP2(indexx, indexy) = chiVector(edofMat(indexx, indexy) + j * ndof - 1);
+            Eigen::MatrixXd chiP2(edofMat.rows(), edofMat.cols());
+            for (int indexx = 0; indexx < chiP1.rows(); indexx++) {
+                for (int indexy = 0; indexy < chiP1.cols(); indexy++) {
+                    chiP2(indexx, indexy) = chiVector(edofMat(indexx, indexy) + j * ndof - 1);
+                }
             }
+
+            //std::cout << "chiP1:\n" << chiP1 << "++++++++++++++++++++++\n";
+            //std::cout << "Chi0:\n" << chi0[i] << "++++++++++++++++++++++\n";
+            //std::cout << "keLambda:\n" << keLambda << "++++++++++++++++++++++\n";
+
+            MatrixXd sumLambdaMult1 = (chi0[i] - chiP1) * keLambda;
+            MatrixXd sumLambdaMult2 = chi0[j] - chiP2;
+            //std::cout << "sumLambdaMult1:\n" << sumLambdaMult1 << "++++++++++++++++++++++\n";
+            //std::cout << "sumLambdaMult2:\n" << sumLambdaMult2 << "++++++++++++++++++++++\n";
+
+            MatrixXd sumLambdaT = ((sumLambdaMult1).cwiseProduct(sumLambdaMult2));
+            MatrixXd sumMuT = (((chi0[i] - chiP1) * keMu).cwiseProduct(chi0[j] - chiP2));
+
+            //std::cout << "sumLambdaT:\n" << sumLambdaT << "++++++++++++++++++++++\n";
+
+            VectorXd sumLambdaRowsum = sumLambdaT.rowwise().sum();
+            VectorXd sumMuRowsum = sumMuT.rowwise().sum();
+
+            //std::cout << "sumLambdaRowWise:\n" << sumLambdaRowsum << "++++++++++++++++++++++\n";
+
+            //VectorXd m;
+            //m << 1, 2, 3, 4, 5, 6, 7, 8, 9;
+            //Matrix3d A = Map<Matrix3d>(m.data())
+
+            MatrixXd sumLambda = Map<MatrixXd>(sumLambdaRowsum.data(), nely, nelx);
+            MatrixXd sumMu = Map<MatrixXd>(sumMuRowsum.data(), nely, nelx);
+
+            MatrixXd LambdaMatrix = Map<MatrixXd>(lambdaOfx.data(), nely, nelx);
+            MatrixXd MuMatrix = Map<MatrixXd>(muOfx.data(), nely, nelx);
+
+            /*std::cout << "iter  "<<i*3+j<<endl<<"sumLambda:\n" << sumLambda << "++++++++++++++++++++++\n";
+            std::cout << "sumMu:\n" << sumMu << "++++++++++++++++++++++\n";
+            std::cout << "LambdaMatrix:\n" << LambdaMatrix << "++++++++++++++++++++++\n";
+            std::cout << LambdaMatrix.cwiseProduct(sumLambda) << "++++++++++++++++++++++\n";
+            std::cout << cellVolume<<endl<<(LambdaMatrix.cwiseProduct(sumLambda) + MuMatrix.cwiseProduct(sumMu)).sum() << "++++++++++++++++++++++\n";*/
+
+            //std::cout << "LambdaVec.*sumLambda:\n" << LambdaMatrix.cwiseProduct(sumLambda) << "+++++++++++++++++++\n";
+            //std::cout << "MuVec.*sumMu:\n" << MuMatrix.cwiseProduct(sumMu) << "+++++++++++++++++++\n";
+
+            CH(i, j) = 1.0 / cellVolume
+                * (LambdaMatrix.cwiseProduct(sumLambda) + MuMatrix.cwiseProduct(sumMu)).sum();
+            //cout << "CH:"<<endl<<CH << endl;
         }
-
-        //std::cout << "chiP1:\n" << chiP1 << "++++++++++++++++++++++\n";
-        //std::cout << "Chi0:\n" << chi0[i] << "++++++++++++++++++++++\n";
-        //std::cout << "keLambda:\n" << keLambda << "++++++++++++++++++++++\n";
-
-        MatrixXd sumLambdaMult1 = (chi0[i] - chiP1) * keLambda;
-        MatrixXd sumLambdaMult2 = chi0[j] - chiP2;
-        //std::cout << "sumLambdaMult1:\n" << sumLambdaMult1 << "++++++++++++++++++++++\n";
-        //std::cout << "sumLambdaMult2:\n" << sumLambdaMult2 << "++++++++++++++++++++++\n";
-
-        MatrixXd sumLambdaT = ((sumLambdaMult1).cwiseProduct(sumLambdaMult2));
-        MatrixXd sumMuT = (((chi0[i] - chiP1) * keMu).cwiseProduct(chi0[j] - chiP2));
-
-        //std::cout << "sumLambdaT:\n" << sumLambdaT << "++++++++++++++++++++++\n";
-
-        VectorXd sumLambdaRowsum = sumLambdaT.rowwise().sum();
-        VectorXd sumMuRowsum = sumMuT.rowwise().sum();
-
-        //std::cout << "sumLambdaRowWise:\n" << sumLambdaRowsum << "++++++++++++++++++++++\n";
-
-        //VectorXd m;
-        //m << 1, 2, 3, 4, 5, 6, 7, 8, 9;
-        //Matrix3d A = Map<Matrix3d>(m.data())
-
-        MatrixXd sumLambda = Map<MatrixXd>(sumLambdaRowsum.data(), nely, nelx);
-        MatrixXd sumMu = Map<MatrixXd>(sumMuRowsum.data(), nely, nelx);
-
-        MatrixXd LambdaMatrix = Map<MatrixXd>(lambdaOfx.data(), nely, nelx);
-        MatrixXd MuMatrix = Map<MatrixXd>(muOfx.data(), nely, nelx);
-
-        //std::cout << "sumLambda:\n" << sumLambda << "++++++++++++++++++++++\n";
-        //std::cout << "LambdaMatrix:\n" << LambdaMatrix << "++++++++++++++++++++++\n";
-
-        //std::cout << "LambdaVec.*sumLambda:\n" << LambdaMatrix.cwiseProduct(sumLambda) << "+++++++++++++++++++\n";
-        //std::cout << "MuVec.*sumMu:\n" << MuMatrix.cwiseProduct(sumMu) << "+++++++++++++++++++\n";
-
-        CH(i, j) = 1.0 / cellVolume
-            * (LambdaMatrix.cwiseProduct(sumLambda) + MuMatrix.cwiseProduct(sumMu)).sum();
     }
-}
+
+    //std::cout << "CH:\n" << CH << "++++++++++++++++++++++\n";
+
     return CH;
 }
 
@@ -953,617 +523,592 @@ void elementMatVec(double a,
 }
 
 
-//MatrixXd homogenize_therm(
-//    int lx, int ly, std::vector<double> lambda, std::vector<double> mu, double phi, MatrixXi x)
-//{
-//    //INITIALIZE
-//    // Deduce discretization
-//    int nely = x.rows(), nelx = x.cols();
-//    // Stiffness matrix consists of two parts, one belonging to lambda and
-//    // one belonging to mu. Same goes for load vector
-//    double dx = (double)lx / nelx, dy = (double)ly / nely;
-//    int nel = nelx * nely;
-//    MatrixXd keLambda, keMu, feLambda, feMu;
-//    elementMatVec(dx / 2, dy / 2, phi, keLambda, keMu, feLambda, feMu);
-//    for (int i = 0; i < keMu.rows(); i += 2) {      // ±éÀúÆæÊıĞĞ£¨MATLABË÷Òı1:2:end¶ÔÓ¦C++Ë÷Òı0,2,4...£©
-//        for (int j = 0; j < keMu.cols(); j += 2) {  // ±éÀúÆæÊıÁĞ
-//            if (i + 1 < keMu.rows() && j + 1 < keMu.cols()) { // ·ÀÖ¹Ô½½ç·ÃÎÊ
-//                keMu(i, j) += keMu(i + 1, j + 1);       // Å¼Î»ÖÃÔªËØÀÛ¼Óµ½ÆæÎ»ÖÃ
-//            }
-//        }
-//    }
-//    // Node numbers and element degrees of freedom for full (not periodic) mesh
-//    //nodenrs = reshape(1:(1+nelx)*(1+nely),1+nely,1+nelx);
-//    MatrixXi nodenrs(nely + 1, nelx + 1);
-//    for (int i = 0, c = 1; i <= nelx; ++i) {
-//        for (int j = 0; j <= nely; ++j) {
-//            nodenrs(j, i) = c++;
-//        }
-//    }
-//    //edofVec = reshape(2 * nodenrs(1:end - 1, 1 : end - 1) + 1, nel, 1);
-//    VectorXi edofVec(nel); 
-//     
-//    for (int i = 0, c = 0; i < nelx; ++i) {
-//        for (int j = 0; j < nely; ++j) {
-//            edofVec(c) = 2 * nodenrs(j, i) + 1;
-//            c++;
-//        }
-//    }
-//    //edofMat = repmat(edofVec, 1, 8) + repmat([0 1 2 * nely + [2 3 0 1] - 2 - 1], nel, 1);
-//    MatrixXi edofMat(nel, 8);
-//    edofMat.col(0) = edofVec;
-//    edofMat.col(1) = edofVec.array() + 1;
-//    edofMat.col(2) = edofVec.array() + 2 * nely + 2;
-//    edofMat.col(3) = edofVec.array() + 2 * nely + 3;
-//    edofMat.col(4) = edofVec.array() + 2 * nely;
-//    edofMat.col(5) = edofVec.array() + 2 * nely + 1;
-//    edofMat.col(6) = edofVec.array() - 2;
-//    edofMat.col(7) = edofVec.array() - 1;
-//
-//    //--------------------------Test----------------------------------------
-//    //std::cout << "keLambda:\n" << keLambda << "++++++++++++++++++++++\n";
-//    //std::cout << "keMu:\n" << keMu << "++++++++++++++++++++++\n";
-//    //std::cout << "feLambda:\n" << feLambda << "++++++++++++++++++++++\n";
-//    //std::cout << "feMu:\n" << feMu << "++++++++++++++++++++++\n";
-//
-//    //std::cout << "nodenrs:\n" << nodenrs << "++++++++++++++++++++++\n";
-//    //std::cout << "edofVec:\n" << edofVec << "++++++++++++++++++++++\n";
-//    //std::cout << "edofMat:\n" << edofMat << "++++++++++++++++++++++\n";
-//    //----------------------------------------------------------------------
-//    //IMPOSE PERIODIC BOUNDARY CONDITIONS
-//    //Use original edofMat to index into list with the periodic dofs
-//    int nn = (nelx + 1) * (nely + 1); // Total number of nodes
-//    int nnP = nelx * nely;            // Total number of unique nodes
-//    Eigen::MatrixXi nnPArray(nely + 1, nelx + 1);
-//    nnPArray.setZero();
-//    for (int i = 0; i < nely; i++)
-//        for (int j = 0; j < nelx; j++)
-//            nnPArray(i, j) = i * nelx + j + 1;
-//    // Extend with a mirror of the top border
-//    for (int j = 0; j < nelx + 1; j++) {
-//        nnPArray(nely, j) = nnPArray(0, j);
-//    }
-//    // Extend with a mirror of the left border
-//    for (int i = 0; i < nely + 1; i++) {
-//        nnPArray(i, nelx) = nnPArray(i, 0);
-//    }
-//
-//    Eigen::VectorXd nnParrayVector(nn);
-//    int indexOfnnParrayVector = 0;
-//    for (int i = 0; i <= nelx; i++) {
-//        for (int j = 0; j <= nely; j++) {
-//            nnParrayVector(indexOfnnParrayVector++) = nnPArray(j, i);
-//        }
-//    }
-//
-//    Eigen::VectorXd dofVector(2 * nn);
-//    dofVector.setZero();
-//
-//    for (int i = 0; i < nn; i++) {
-//        dofVector(i * 2) = 2 * nnParrayVector(i) - 1;
-//        dofVector(i * 2 + 1) = 2 * nnParrayVector(i);
-//    }
-//
-//    //for (int i = 0; i <= nely; i++)
-//    //{
-//    //	for (int j = 0; j <= nelx; j++)
-//    //	{
-//    //		int p = i * nelx + nelx - j;
-//    //		dofVector(2 * p) = 2 * (nnPArray(j, i)) - 1;
-//    //		dofVector(2 * p + 1) = 2 * (nnPArray(j, i));
-//    //	}
-//    //}
-//
-//    Eigen::MatrixXi edofMatNew(nel, 8);
-//    for (int i = 0; i < nel; i++)
-//        for (int j = 0; j < 8; j++)
-//            edofMatNew(i, j) = dofVector(edofMat(i, j) - 1);
-//    edofMat = edofMatNew;
-//    int ndof = 2 * nnP; // Number of dofs
-//
-//    //--------------------------Test----------------------------------------
-//    //std::cout << "nnPArray:\n" << nnPArray << "++++++++++++++++++++++\n";
-//    //std::cout << "nnParrayVector:\n" << nnParrayVector << "++++++++++++++++++++++\n";
-//    //std::cout << "dofVector:\n" << dofVector << "++++++++++++++++++++++\n";
-//    //std::cout << "edofMat:\n" << edofMat << "++++++++++++++++++++++\n";
-//    //std::cout << "feMu:\n" << feMu << "++++++++++++++++++++++\n";
-//    //std::cout << "nodenrs:\n" << nodenrs << "++++++++++++++++++++++\n";
-//    //std::cout << "edofVec:\n" << edofVec << "++++++++++++++++++++++\n";
-//    //std::cout << "edofMat:\n" << edofMat << "++++++++++++++++++++++\n";
-//    //----------------------------------------------------------------------
-//
-//    // ASSEMBLE STIFFNESS MATRIX
-//    // Indexing vectors
-//    //Eigen::MatrixXi iK = Eigen::Map<Eigen::MatrixXi>(edofMat.data(), edofMat.size(), 1).replicate(1, 8).transpose();
-//    //Eigen::MatrixXi jK = Eigen::Map<Eigen::MatrixXi>(edofMat.data(), edofMat.size(), 1).replicate(8, 1);
-//
-//    Eigen::MatrixXi iKones = Eigen::MatrixXi::Ones(8, 1);
-//    Eigen::MatrixXi iK = Eigen::kroneckerProduct(edofMat, iKones).transpose();
-//
-//    Eigen::MatrixXi jKones = Eigen::MatrixXi::Ones(1, 8);
-//    Eigen::MatrixXi jK = Eigen::kroneckerProduct(edofMat, jKones).transpose();
-//
-//    //std::cout << "iK:\n" << iK << "++++++++++++++++++++++\n";
-//    //std::cout << "jK:\n" << jK << "++++++++++++++++++++++\n";
-//
-//    // Material properties in the different elements
-//    Eigen::VectorXd lambdaOfx(nel);
-//    Eigen::VectorXd muOfx(nel);
-//    for (int i = 0; i < nel; i++) {
-//        if (x(i) == 1) {
-//            lambdaOfx(i) = lambda[0];
-//            muOfx(i) = mu[0];
-//        }
-//        else if (x(i) == 2) {
-//            lambdaOfx(i) = lambda[1];
-//            muOfx(i) = mu[1];
-//        }
-//    }
-//    // The corresponding stiffness matrix entries
-//    Eigen::VectorXd keLambdaVector(keLambda.rows() * keLambda.cols());
-//    Eigen::VectorXd keMuVector(keMu.rows() * keMu.cols());
-//    int indexOfkeLambdaVector = 0;
-//    for (int i = 0; i < keLambda.cols(); i++) {
-//        for (int j = 0; j < keLambda.rows(); j++) {
-//            keLambdaVector(indexOfkeLambdaVector++) = keLambda(j, i);
-//        }
-//    }
-//    int indexOfkeMuVector = 0;
-//    for (int i = 0; i < keMu.cols(); i++) {
-//        for (int j = 0; j < keMu.rows(); j++) {
-//            keMuVector(indexOfkeMuVector++) = keMu(j, i);
-//        }
-//    }
-//    Eigen::MatrixXd sK = (keLambdaVector * lambdaOfx.transpose() + keMuVector * muOfx.transpose());
-//
-//    //std::cout << "sK:\n" << sK << "++++++++++++++++++++++\n";
-//
-//    //std::cout << iK.rows() * iK.cols() << "   ===    " << jK.rows() * jK.cols() << "  ===  " << sK.rows() * sK.cols() << '\n';
-//
-//    //MatrixXf M1(3, 3);    // Column-major storage
-//    //M1 << 1, 2, 3,
-//    //	4, 5, 6,
-//    //	7, 8, 9;
-//
-//    //Map<RowVectorXf> v1(M1.data(), M1.size());
-//    //cout << "v1:" << endl << v1 << endl;
-//
-//    //Matrix<float, Dynamic, Dynamic, RowMajor> M2(M1);
-//    //Map<RowVectorXf> v2(M2.data(), M2.size());
-//    //cout << "v2:" << endl << v2 << endl;
-//
-//    Map<VectorXi> iKVector(iK.data(), iK.size());
-//    Map<VectorXi> jKVector(jK.data(), jK.size());
-//    Map<VectorXd> sKVector(sK.data(), sK.size());
-//
-//    Eigen::SparseMatrix<double> K = Eigen::SparseMatrix<double>(ndof, ndof);
-//    //// Fill K with triplets
-//    std::vector<Eigen::Triplet<double>> triplets;
-//    for (int i = 0; i < iK.size(); ++i) {
-//        triplets.emplace_back(iKVector(i) - 1, jKVector(i) - 1, sKVector(i));
-//    }
-//    K.setFromTriplets(triplets.begin(), triplets.end());
-//
-//    //--------------------------Test----------------------------------------
-//    //----------------------------------------------------------------------
-//
-//    //std::cout << "K:\n" << MatrixXd(K) << "++++++++++++++++++++++\n";
-//
-//    //----------------------------------------------------------------------
-//    //----------------------------------------------------------------------
-//    //LOAD VECTORS AND SOLUTION
-//    Eigen::VectorXd feLambdaVector(feLambda.rows() * feLambda.cols());
-//    Eigen::VectorXd feMuVector(feMu.rows() * feMu.cols());
-//    int indexOffeLambdaVector = 0;
-//    for (int i = 0; i < feLambda.cols(); i++) {
-//        for (int j = 0; j < feLambda.rows(); j++) {
-//            feLambdaVector(indexOffeLambdaVector++) = feLambda(j, i);
-//        }
-//    }
-//    int indexOffeMuVector = 0;
-//    for (int i = 0; i < feMu.cols(); i++) {
-//        for (int j = 0; j < feMu.rows(); j++) {
-//            feMuVector(indexOffeMuVector++) = feMu(j, i);
-//        }
-//    }
-//
-//    Eigen::MatrixXd sF = (feLambdaVector * lambdaOfx.transpose() + feMuVector * muOfx.transpose());
-//    //std::cout << "feLambdaVector:\n" << feLambdaVector << "++++++++++++++++++++++\n";
-//    //std::cout << "feMuVector:\n" << feMuVector << "++++++++++++++++++++++\n";
-//    //std::cout << "sF:\n" << sF << "++++++++++++++++++++++\n";
-//
-//    //			//nel * 8
-//    Eigen::MatrixXi iF(24, nel);
-//    Eigen::MatrixXi edofMatT = edofMat.transpose();
-//    iF.block(0, 0, edofMatT.rows(), edofMatT.cols()) = edofMatT;
-//    iF.block(edofMatT.rows(), 0, edofMatT.rows(), edofMatT.cols()) = edofMatT;
-//    iF.block(edofMatT.rows() * 2, 0, edofMatT.rows(), edofMatT.cols()) = edofMatT;
-//
-//    Eigen::MatrixXi jF(24, nel);
-//    Eigen::MatrixXi jFzeros = Eigen::MatrixXi::Ones(8, nel);
-//    jF.block(0, 0, jFzeros.rows(), jFzeros.cols()) = jFzeros;
-//    jF.block(jFzeros.rows(), 0, jFzeros.rows(), jFzeros.cols()) = jFzeros * 2;
-//    jF.block(jFzeros.rows() * 2, 0, jFzeros.rows(), jFzeros.cols()) = jFzeros * 3;
-//
-//    Map<VectorXi> iFVector(iF.data(), iF.size());
-//    Map<VectorXi> jFVector(jF.data(), jF.size());
-//    Map<VectorXd> sFVector(sF.data(), sF.size());
-//
-//    Eigen::SparseMatrix<double> F(ndof, 3);
-//
-//    std::vector<Eigen::Triplet<double>> triplets2;
-//    for (int i = 0; i < iF.size(); ++i) {
-//        triplets2.emplace_back(iFVector(i) - 1, jFVector(i) - 1, sFVector(i));
-//    }
-//    F.setFromTriplets(triplets2.begin(), triplets2.end());
-//
-//    Eigen::SparseMatrix<double> chi(ndof, 2);
-//    // Éú³É×Ó¾ØÕóµÄĞĞË÷Òı (MATLAB: 3:2:end ¡ú C++Ë÷Òı 2,4,6...)
-//    std::vector<int> sub_rows;
-//    for (int i = 2; i < ndof; i += 2) {
-//        sub_rows.push_back(i);
-//    }
-//
-//    // ÌáÈ¡ F µÄÁĞÊı¾İ£ºÁĞ0È¡ sub_rows ĞĞ£¬ÁĞ1È¡ sub_rows_F2 ĞĞ (MATLAB: 4:2:end ¡ú 3,5,7...)
-//    std::vector<int> sub_rows_F2;
-//    for (int i = 3; i < ndof; i += 2) {
-//        sub_rows_F2.push_back(i);
-//    }
-//    assert(sub_rows.size() == sub_rows_F2.size());
-//
-//    // ¹¹½¨ÓÒ²à¾ØÕó F_sub (ÃÜ¼¯¾ØÕó)
-//    MatrixXd F_sub(sub_rows.size(), 2);
-//    for (size_t i = 0; i < sub_rows.size(); ++i) {
-//        F_sub(i, 0) = F.coeff(sub_rows[i], 0);  // µÚÒ»ÁĞ
-//        F_sub(i, 1) = F.coeff(sub_rows_F2[i], 1); // µÚ¶şÁĞ
-//    }
-//
-//
-//    std::vector<int> K_rows_cols; // kÄ¿±êĞĞÁĞË÷Òı 
-//   
-//    for (int i = 2; i < K.rows(); i += 2) {
-//        K_rows_cols.push_back(i);
-//    }
-//    //k(3:2:end,3:2:end)
-//    MatrixXd k3_2_end_3_2_end(K_rows_cols.size(), K_rows_cols.size());
-//    for (int i = 0; i < k3_2_end_3_2_end.rows(); i++) {
-//        for (int j = 0; j < k3_2_end_3_2_end.cols(); j++) {
-//            k3_2_end_3_2_end(i, j) = K.coeff(K_rows_cols[i], K_rows_cols[j]);
-//        }
-//    }
-//
-//    //std::unordered_map<int, int> row_map;
-//    //for (size_t i = 0; i < sub_rows.size(); ++i) {
-//    //    row_map[sub_rows[i]] = i;
-//    //}
-//    //std::vector<Triplet<double>> k_triplets;
-//    //for (int k = 0; k < K.outerSize(); ++k) {
-//    //    for (SparseMatrix<double>::InnerIterator it(K, k); it; ++it) {
-//    //        int row = it.row();
-//    //        int col = it.col();
-//    //        auto row_iter = row_map.find(row);
-//    //        auto col_iter = row_map.find(col);
-//    //        if (row_iter != row_map.end() && col_iter != row_map.end()) {
-//    //            k_triplets.emplace_back(row_iter->second, col_iter->second, it.value());
-//    //        }
-//    //    }
-//    //}
-//    //SparseMatrix<double> k3_2_end_3_2_end(sub_rows.size(), sub_rows.size());
-//    //k3_2_end_3_2_end.setFromTriplets(k_triplets.begin(), k_triplets.end());
-//
-//    Eigen::FullPivLU<Eigen::MatrixXd> solver;
-//    solver.compute(k3_2_end_3_2_end);
-//    Eigen::MatrixXd X1= solver.solve(F_sub);
-//
-//    
-//    //chi = solver.solve(F.block(2, 0, ndof - 2, 3)); // Çó½âÏßĞÔ·½³Ì×é
-//    // ½«½â½á¹ûÌî³äµ½ chi µÄÏ¡Êè¾ØÕóÖĞ£¨½ö·ÇÁãÖµ£©
-//    std::vector<Triplet<double>> chi_triplets;
-//    for (int i = 0; i < X1.rows(); ++i) {
-//        int global_row = sub_rows[i]; // ¶ÔÓ¦Ô­Ê¼ĞĞºÅ
-//        double val1 = X1(i, 0), val2 = X1(i, 1);
-//        if (val1 != 0.0) chi_triplets.emplace_back(global_row, 0, val1);
-//        if (val2 != 0.0) chi_triplets.emplace_back(global_row, 1, val2);
-//    }
-//    chi.setFromTriplets(chi_triplets.begin(), chi_triplets.end());
-//
-////HOMOGENIZATION
-////×¢ÒâÎÊÌâ  matlabµÄÏÂ±ê¿ÉÄÜÓëEigen²»Í¬
-//
-//    Eigen::MatrixXd chi0[3];
-//    chi0[0] = Eigen::MatrixXd(nel, 8);
-//    chi0[0].setZero();
-//    chi0[1] = Eigen::MatrixXd(nel, 8);
-//    chi0[1].setZero();
-//    chi0[2] = Eigen::MatrixXd(nel, 8);
-//    chi0[2].setZero();
-//
-//    Eigen::MatrixXd chi0_e = Eigen::MatrixXd(8, 3);
-//    chi0_e.setZero();
-//    Eigen::MatrixXd ke = keMu + keLambda;
-//    Eigen::MatrixXd fe = feMu + feLambda;
-//
-//    //chi0_e(3:2:end,1:2) = keMu(3:2:end,3:2:end)\[feMu(3:2:end,1) feMu(4:2:end,2)];
-//    /*MatrixXd ke3_5end_3_5end(ke.rows() - 3, ke.cols() - 3);
-//    for (int i = 0; i < ke3_5end_3_5end.rows(); i++) {
-//        for (int j = 0; j < ke3_5end_3_5end.cols(); j++) {
-//            int indexi = i;
-//            int indexj = j;
-//            if (i == 0)
-//                indexi = 2;
-//            else
-//                indexi = i + 3;
-//            if (j == 0)
-//                indexj = 2;
-//            else
-//                indexj = j + 3;
-//
-//            ke3_5end_3_5end(i, j) = ke(indexi, indexj);
-//        }
-//    }
-//    MatrixXd fe3_5end(fe.rows() - 3, fe.cols());
-//    for (int i = 0; i < fe3_5end.rows(); i++) {
-//        int indexi = i;
-//        if (i == 0)
-//            indexi = 2;
-//        else
-//            indexi = i + 3;
-//
-//        fe3_5end.row(i) = fe.row(indexi);
-//    }
-//    MatrixXd ke3_5cfe3_5 = ke3_5end_3_5end.inverse() * fe3_5end;
-//
-//    for (int i = 0; i < ke3_5cfe3_5.rows(); i++) {
-//        int indexi = i;
-//        if (i == 0)
-//            indexi = 2;
-//        else
-//            indexi = i + 3;
-//
-//        chi0_e.row(indexi) = ke3_5cfe3_5.row(i);
-//    }*/
-//    std::vector<int> kemu_rows_cols; // kemuÄ¿±êĞĞÁĞË÷Òı 
-//    std::vector<int> kemu_rows_cols2; // kemuÄ¿±êĞĞÁĞË÷Òı 
-//    for (int i = 2; i < keMu.rows(); i += 2) {
-//        kemu_rows_cols.push_back(i);
-//    }
-//
-//    for (int i = 2; i < keMu.cols(); i += 2) {
-//        kemu_rows_cols2.push_back(i);
-//    }
-//
-//    //keMu(3:2:end,3:2:end)
-//    MatrixXd keMu3_2_end_3_2_end(kemu_rows_cols.size(), kemu_rows_cols.size());
-//    for (int i = 0; i < keMu3_2_end_3_2_end.rows(); i++) {
-//        for (int j = 0; j < keMu3_2_end_3_2_end.cols(); j++) {
-//            keMu3_2_end_3_2_end(i, j) = keMu(kemu_rows_cols[i], kemu_rows_cols[j]);
-//        }
-//    }
-//
-//    std::vector<int> femu_rows1; // feMuÆæÊıĞĞµÚÒ»ÁĞĞĞÁĞË÷Òı 
-//    std::vector<int> femu_rows2; // feMuÅ¼ÊıĞĞµÚ¶şÁĞĞĞÁĞË÷Òı 
-//    for (int i = 2; i < feMu.rows(); i += 2) {
-//        femu_rows1.push_back(i);
-//    }
-//    for (int i = 3; i < feMu.rows(); i += 2) {
-//        femu_rows2.push_back(i);
-//    }
-//    assert(femu_rows1.size() == femu_rows2.size());
-//
-//    if (femu_rows1.size() != femu_rows2.size())
-//        std::cout << "femu ²»ÊÇÅ¼ÊıĞĞ" << std::endl;
-//
-//    MatrixXd Femu_sub(femu_rows1.size(), 2);
-//    for (int i = 0; i < femu_rows1.size(); i++) {
-//        Femu_sub(i, 0) = feMu(femu_rows1[i], 0); // µÚÒ»ÁĞ
-//        Femu_sub(i, 1) = feMu(femu_rows2[i], 1); // µÚ¶şÁĞ
-//    }
-//
-//    Eigen::FullPivLU<Eigen::MatrixXd> lu_solver;
-//    lu_solver.compute(keMu3_2_end_3_2_end);
-//    Eigen::MatrixXd X2 = lu_solver.solve(Femu_sub);
-//
-//    // ===================================================================
-//    for (int i = 0; i < kemu_rows_cols.size(); ++i) {
-//        const int row = kemu_rows_cols[i];
-//        chi0_e(row, 0) = X2(i, 0);  // µÚÒ»ÁĞ
-//        chi0_e(row, 1) = X2(i, 1);  // µÚ¶şÁĞ
-//    }
-//
-//    //std::cout << "chi0_e\n" << chi0_e << "++++++++++++++++++++++\n";
-//
-//    VectorXd chi0_e_1 = chi0_e.col(0);
-//    VectorXd chi0_e_2 = chi0_e.col(1);
-//    VectorXd chi0_e_3 = chi0_e.col(2);
-//
-//    VectorXd epsilonones = VectorXd::Ones(nel);
-//
-//    chi0[0] = Eigen::kroneckerProduct(chi0_e_1.transpose(), epsilonones);
-//    chi0[1] = Eigen::kroneckerProduct(chi0_e_2.transpose(), epsilonones);
-//    chi0[2] = Eigen::kroneckerProduct(chi0_e_3.transpose(), epsilonones);
-//
-//    //std::cout << "chi0[0]:\n" << chi0[0] << "++++++++++++++++++++++\n";
-//    //std::cout << "chi0[1]:\n" << chi0[1] << "++++++++++++++++++++++\n";
-//    //std::cout << "chi0[2]:\n" << chi0[2] << "++++++++++++++++++++++\n";
-//
-//    //std::cout << "chi0_e1:\n" << chi0_e_1 << "++++++++++++++++++++++\n";
-//    //std::cout << "chi0_e2:\n" << chi0_e_2 << "++++++++++++++++++++++\n";
-//    //std::cout << "chi0_e3:\n" << chi0_e_3 << "++++++++++++++++++++++\n";
-//
-//    Eigen::MatrixXd CH = Eigen::MatrixXd::Zero(3, 3);
-//    double cellVolume = lx * ly;
-//    Eigen::MatrixXd chiMatrix(chi);
-//
-//    Eigen::MatrixXd chiMatrix2(chiMatrix.rows() + 2, chiMatrix.cols());
-//    chiMatrix2.row(0) = VectorXd::Zero(chiMatrix.cols());
-//    chiMatrix2.row(1) = VectorXd::Zero(chiMatrix.cols());
-//    chiMatrix2.block(2, 0, chiMatrix.rows(), chiMatrix.cols()) = chiMatrix;
-//
-//    //std::cout << "chiMatrix:\n" << chiMatrix2 << "++++++++++++++++++++++\n";
-//
-//    Map<VectorXd> chiVector(chiMatrix2.data(), chiMatrix2.size());
-//
-//    for (int i = 0; i < 3; i++) {
-//        for (int j = 0; j < 3; j++) {
-//            Eigen::MatrixXd chiP1(edofMat.rows(), edofMat.cols());
-//            for (int indexx = 0; indexx < chiP1.rows(); indexx++) {
-//                for (int indexy = 0; indexy < chiP1.cols(); indexy++) {
-//                    chiP1(indexx, indexy) = chiVector(edofMat(indexx, indexy) + i * ndof - 1);
-//                }
-//            }
-//            Eigen::MatrixXd chiP2(edofMat.rows(), edofMat.cols());
-//            for (int indexx = 0; indexx < chiP1.rows(); indexx++) {
-//                for (int indexy = 0; indexy < chiP1.cols(); indexy++) {
-//                    chiP2(indexx, indexy) = chiVector(edofMat(indexx, indexy) + j * ndof - 1);
-//                }
-//            }
-//
-//            //std::cout << "chiP1:\n" << chiP1 << "++++++++++++++++++++++\n";
-//            //std::cout << "Chi0:\n" << chi0[i] << "++++++++++++++++++++++\n";
-//            //std::cout << "keLambda:\n" << keLambda << "++++++++++++++++++++++\n";
-//
-//            MatrixXd sumLambdaMult1 = (chi0[i] - chiP1) * keLambda;
-//            MatrixXd sumLambdaMult2 = chi0[j] - chiP2;
-//            //std::cout << "sumLambdaMult1:\n" << sumLambdaMult1 << "++++++++++++++++++++++\n";
-//            //std::cout << "sumLambdaMult2:\n" << sumLambdaMult2 << "++++++++++++++++++++++\n";
-//
-//            MatrixXd sumLambdaT = ((sumLambdaMult1).cwiseProduct(sumLambdaMult2));
-//            MatrixXd sumMuT = (((chi0[i] - chiP1) * keMu).cwiseProduct(chi0[j] - chiP2));
-//
-//            //std::cout << "sumLambdaT:\n" << sumLambdaT << "++++++++++++++++++++++\n";
-//
-//            VectorXd sumLambdaRowsum = sumLambdaT.rowwise().sum();
-//            VectorXd sumMuRowsum = sumMuT.rowwise().sum();
-//
-//            //std::cout << "sumLambdaRowWise:\n" << sumLambdaRowsum << "++++++++++++++++++++++\n";
-//
-//            //VectorXd m;
-//            //m << 1, 2, 3, 4, 5, 6, 7, 8, 9;
-//            //Matrix3d A = Map<Matrix3d>(m.data())
-//
-//            MatrixXd sumLambda = Map<MatrixXd>(sumLambdaRowsum.data(), nely, nelx);
-//            MatrixXd sumMu = Map<MatrixXd>(sumMuRowsum.data(), nely, nelx);
-//
-//            MatrixXd LambdaMatrix = Map<MatrixXd>(lambdaOfx.data(), nely, nelx);
-//            MatrixXd MuMatrix = Map<MatrixXd>(muOfx.data(), nely, nelx);
-//
-//            //std::cout << "sumLambda:\n" << sumLambda << "++++++++++++++++++++++\n";
-//            //std::cout << "LambdaMatrix:\n" << LambdaMatrix << "++++++++++++++++++++++\n";
-//
-//            //std::cout << "LambdaVec.*sumLambda:\n" << LambdaMatrix.cwiseProduct(sumLambda) << "+++++++++++++++++++\n";
-//            //std::cout << "MuVec.*sumMu:\n" << MuMatrix.cwiseProduct(sumMu) << "+++++++++++++++++++\n";
-//
-//            CH(i, j) = 1.0 / cellVolume
-//                * (LambdaMatrix.cwiseProduct(sumLambda) + MuMatrix.cwiseProduct(sumMu)).sum();
-//        }
-//    }
-//
-//    //std::cout << "CH:\n" << CH << "++++++++++++++++++++++\n";
-//
-//    return CH;
-//}
-//
-//void elementMatVec_therm(double a,
-//    double b,
-//    double phi,
-//    MatrixXd& keLambda,
-//    MatrixXd& keMu,
-//    MatrixXd& feLambda,
-//    MatrixXd& feMu)
-//{
-//    // Constitutive matrix contributions
-//    Matrix3d CMu = Matrix3d::Zero();
-//    CMu.diagonal() << 1, 1, 0;
-//    Matrix3d CLambda = Matrix3d::Zero();
-//
-//    //std::cout << "CLambda:::\n" << CLambda << '\n';
-//
-//    // Two Gauss points in both directions
-//    double xx[2] = { -1.0 / sqrt(3.0), 1.0 / sqrt(3.0) };
-//    double yy[2] = { -1.0 / sqrt(3.0), 1.0 / sqrt(3.0) };
-//    double ww[2] = { 1.0, 1.0 };
-//
-//    // Initialize
-//    keLambda = MatrixXd::Zero(8, 8);
-//    keMu = MatrixXd::Zero(8, 8);
-//    feLambda = MatrixXd::Zero(8, 3);
-//    feMu = MatrixXd::Zero(8, 3);
-//
-//    Matrix<double, 3, 4> L;
-//    L << 1, 0, 0, 0, 0, 0, 0, 1, 0, 1, 1, 0;
-//
-//    for (int ii = 0; ii < 2; ii++) {
-//        for (int jj = 0; jj < 2; jj++) {
-//            // Integration point
-//            double x = xx[ii];
-//            double y = yy[jj];
-//
-//            // Differentiated shape functions
-//            VectorXd dNx(4), dNy(4);
-//            dNx << -(1 - y), 1 - y, 1 + y, -(1 + y);
-//            dNy << -(1 - x), -(1 + x), 1 + x, 1 - x;
-//            dNx /= 4.0;
-//            dNy /= 4.0;
-//
-//            //std::cout << dNx << '\n';
-//            //std::cout << dNy << '\n';
-//
-//            // Jacobian
-//            MatrixXd dN_t(2, 4);
-//            dN_t.row(0) = dNx;
-//            dN_t.row(1) = dNy;
-//
-//            MatrixXd dN_tt(4, 2);
-//            VectorXd vec1(4), vec2(4);
-//            vec1 << -a, a, a + 2 * b / tan(phi * M_PI / 180), 2 * b / tan(phi * M_PI / 180) - a;
-//            vec2 << -b, -b, b, b;
-//            dN_tt.col(0) = vec1;
-//            dN_tt.col(1) = vec2;
-//
-//            //std::cout << "dN_t:::\n" << dN_t << '\n';
-//            //std::cout << "dN_tt:::\n" << dN_tt << '\n';
-//
-//            Matrix2d J = dN_t * dN_tt;
-//            //J.row(0) << dN_t.row(0) * Matrix<double, 4, 1>(-a, a, a + 2 * b / tan(phi * M_PI / 180), 2 * b / tan(phi * M_PI / 180) - a);
-//            //J.row(1) << dN_t.row(1) * Matrix<double, 4, 1>(-b, -b, b, b);
-//
-//            //std::cout << "J:::\n" << J << '\n';
-//
-//            double detJ = J.determinant();
-//            Matrix2d invJ;
-//            invJ << J(1, 1), -J(0, 1), -J(1, 0), J(0, 0);
-//            invJ *= 1.0 / detJ;
-//
-//            // Weight factor at this point
-//            double weight = ww[ii] * ww[jj] * detJ;
-//
-//            // Strain-displacement matrix
-//            MatrixXd G(4, 4);
-//            G.setZero();
-//            G.block<2, 2>(0, 0) = invJ;
-//            G.block<2, 2>(2, 2) = invJ;
-//            MatrixXd dN = Matrix<double, 4, 8>::Zero();
-//            for (int indexOfdN = 0; indexOfdN < 4; indexOfdN++) {
-//                dN(0, indexOfdN * 2) = dNx(indexOfdN);
-//                dN(1, indexOfdN * 2) = dNy(indexOfdN);
-//                dN(2, indexOfdN * 2 + 1) = dNx(indexOfdN);
-//                dN(3, indexOfdN * 2 + 1) = dNy(indexOfdN);
-//            }
-//
-//            MatrixXd B = L * G * dN;
-//            //std::cout << "G:::\n" << G << '\n';
-//            //std::cout << "dN:::\n" << dN << '\n';
-//            //std::cout << "B:::\n" << B << '\n';
-//
-//            // Element matrices
-//            keLambda += weight * (B.transpose() * CLambda * B);
-//            keMu += weight * (B.transpose() * CMu * B);
-//            // Element loads
-//            feLambda += weight * (B.transpose() * CLambda * MatrixXd::Identity(3, 3));
-//            feMu += weight * (B.transpose() * CMu * MatrixXd::Identity(3, 3));
-//
-//            //std::cout << keLambda << '\n';
-//        }
-//    }
-//}
+MatrixXd homogenize_therm(
+    int lx, int ly, std::vector<double> lambda, std::vector<double> mu, double phi, MatrixXi x)
+{
+    //INITIALIZE
+    // Deduce discretization
+    int nely = x.rows(), nelx = x.cols();
+    // Stiffness matrix consists of two parts, one belonging to lambda and
+    // one belonging to mu. Same goes for load vector
+    double dx = (double)lx / nelx, dy = (double)ly / nely;
+    int nel = nelx * nely;
+    MatrixXd keLambda, keMu, feLambda, feMu;
+    elementMatVec_therm(dx / 2, dy / 2, phi, keLambda, keMu, feLambda, feMu);
+    for (int i = 0; i < keMu.rows(); i += 2) {      // éå†å¥‡æ•°è¡Œï¼ˆMATLABç´¢å¼•1:2:endå¯¹åº”C++ç´¢å¼•0,2,4...ï¼‰
+        for (int j = 0; j < keMu.cols(); j += 2) {  // éå†å¥‡æ•°åˆ—
+            if (i + 1 < keMu.rows() && j + 1 < keMu.cols()) { // é˜²æ­¢è¶Šç•Œè®¿é—®
+                keMu(i, j) += keMu(i + 1, j + 1);       // å¶ä½ç½®å…ƒç´ ç´¯åŠ åˆ°å¥‡ä½ç½®
+            }
+        }
+    }
+    //cout << keMu << endl<< "kela:"<<keLambda<<"fela:"<<feLambda<<"fem:"<<feMu<<endl;
+    // Node numbers and element degrees of freedom for full (not periodic) mesh
+    //nodenrs = reshape(1:(1+nelx)*(1+nely),1+nely,1+nelx);
+    MatrixXi nodenrs(nely + 1, nelx + 1);
+    for (int i = 0, c = 1; i <= nelx; ++i) {
+        for (int j = 0; j <= nely; ++j) {
+            nodenrs(j, i) = c++;
+        }
+    }
+    //cout << nodenrs.rows() << "   " << nodenrs.cols() << endl << nodenrs << endl;
+    //edofVec = reshape(2 * nodenrs(1:end - 1, 1 : end - 1) + 1, nel, 1);
+    VectorXi edofVec(nel); 
+     
+    for (int i = 0, c = 0; i < nelx; ++i) {
+        for (int j = 0; j < nely; ++j) {
+            edofVec(c) = 2 * nodenrs(j, i) + 1;
+            c++;
+        }
+    }
+    //cout << edofVec << endl;
+    //edofMat = repmat(edofVec, 1, 8) + repmat([0 1 2 * nely + [2 3 0 1] - 2 - 1], nel, 1);
+    MatrixXi edofMat(nel, 8);
+    edofMat.col(0) = edofVec;
+    edofMat.col(1) = edofVec.array() + 1;
+    edofMat.col(2) = edofVec.array() + 2 * nely + 2;
+    edofMat.col(3) = edofVec.array() + 2 * nely + 3;
+    edofMat.col(4) = edofVec.array() + 2 * nely;
+    edofMat.col(5) = edofVec.array() + 2 * nely + 1;
+    edofMat.col(6) = edofVec.array() - 2;
+    edofMat.col(7) = edofVec.array() - 1;
+  
+    //--------------------------Test----------------------------------------
+    //std::cout << "keLambda:\n" << keLambda << "++++++++++++++++++++++\n";
+    //std::cout << "keMu:\n" << keMu << "++++++++++++++++++++++\n";
+    //std::cout << "feLambda:\n" << feLambda << "++++++++++++++++++++++\n";
+    //std::cout << "feMu:\n" << feMu << "++++++++++++++++++++++\n";
+
+    //std::cout << "nodenrs:\n" << nodenrs << "++++++++++++++++++++++\n";
+    //std::cout << "edofVec:\n" << edofVec << "++++++++++++++++++++++\n";
+    //std::cout << "edofMat:\n" << edofMat << "++++++++++++++++++++++\n";
+    //----------------------------------------------------------------------
+    //IMPOSE PERIODIC BOUNDARY CONDITIONS
+    //Use original edofMat to index into list with the periodic dofs
+    int nn = (nelx + 1) * (nely + 1); // Total number of nodes
+    int nnP = nelx * nely;            // Total number of unique nodes
+    Eigen::MatrixXi nnPArray(nely + 1, nelx + 1);
+    nnPArray.setZero();
+    for (int i = 0; i < nely; i++)
+        for (int j = 0; j < nelx; j++)
+            nnPArray(j, i) = i * nelx + j + 1;
+    // Extend with a mirror of the top border
+    for (int j = 0; j < nelx + 1; j++) {
+        nnPArray(nely, j) = nnPArray(0, j);
+    }
+    // Extend with a mirror of the left border
+    for (int i = 0; i < nely + 1; i++) {
+        nnPArray(i, nelx) = nnPArray(i, 0);
+    }
+    Eigen::VectorXd nnParrayVector(nn);
+    int indexOfnnParrayVector = 0;
+    for (int i = 0; i <= nelx; i++) {
+        for (int j = 0; j <= nely; j++) {
+            nnParrayVector(indexOfnnParrayVector++) = nnPArray(j, i);
+        }
+    }
+    //cout <<"nnParrayVector:"<< nnParrayVector << endl;
+    Eigen::VectorXd dofVector(2 * nn);
+    dofVector.setZero();
+
+    for (int i = 0; i < nn; i++) {
+        dofVector(i * 2) = 2 * nnParrayVector(i) - 1;
+        dofVector(i * 2 + 1) = 2 * nnParrayVector(i);
+    }
+
+    //for (int i = 0; i <= nely; i++)
+    //{
+    //	for (int j = 0; j <= nelx; j++)
+    //	{
+    //		int p = i * nelx + nelx - j;
+    //		dofVector(2 * p) = 2 * (nnPArray(j, i)) - 1;
+    //		dofVector(2 * p + 1) = 2 * (nnPArray(j, i));
+    //	}
+    //}
+
+    Eigen::MatrixXi edofMatNew(nel, 8);
+    for (int i = 0; i < nel; i++)
+        for (int j = 0; j < 8; j++)
+        {
+            edofMatNew(i, j) = dofVector(edofMat(i, j) - 1);
+            //cout<<i<<"  "<<j<<"   edofMat(i, j) - 1:"<< edofMat(i, j) - 1<<"     val:"<< dofVector(edofMat(i, j) - 1) << endl;
+        }
+    edofMat = edofMatNew;
+    int ndof = 2 * nnP; // Number of dofs
+    //std::cout << "edofMat:\n" << ndof<<endl<<edofMat.cols() << endl << edofMat.row(0) << "++++++++++++++++++++++\n";
+    //--------------------------Test----------------------------------------
+    //std::cout << "nnPArray:\n" << nnPArray << "++++++++++++++++++++++\n";
+    //std::cout << "nnParrayVector:\n" << nnParrayVector << "++++++++++++++++++++++\n";
+    //std::cout << "dofVector:\n" << dofVector << "++++++++++++++++++++++\n";
+    //std::cout << "edofMat:\n" << edofMat << "++++++++++++++++++++++\n";
+    //std::cout << "feMu:\n" << feMu << "++++++++++++++++++++++\n";
+    //std::cout << "nodenrs:\n" << nodenrs << "++++++++++++++++++++++\n";
+    //std::cout << "edofVec:\n" << edofVec << "++++++++++++++++++++++\n";
+    //std::cout << "edofMat:\n" << edofMat << "++++++++++++++++++++++\n";
+    //----------------------------------------------------------------------
+
+    // ASSEMBLE STIFFNESS MATRIX
+    // Indexing vectors
+    //Eigen::MatrixXi iK = Eigen::Map<Eigen::MatrixXi>(edofMat.data(), edofMat.size(), 1).replicate(1, 8).transpose();
+    //Eigen::MatrixXi jK = Eigen::Map<Eigen::MatrixXi>(edofMat.data(), edofMat.size(), 1).replicate(8, 1);
+
+    Eigen::MatrixXi iKones = Eigen::MatrixXi::Ones(8, 1);
+    Eigen::MatrixXi iK = Eigen::kroneckerProduct(edofMat, iKones).transpose();
+
+    Eigen::MatrixXi jKones = Eigen::MatrixXi::Ones(1, 8);
+    Eigen::MatrixXi jK = Eigen::kroneckerProduct(edofMat, jKones).transpose();
+
+    //std::cout << "iK:\n" << iK.size()<<endl<<iK.col(0)<< "++++++++++++++++++++++\n";
+    //std::cout << "jK:\n" << jK.col(0) << "++++++++++++++++++++++\n";
+
+    // Material properties in the different elements
+    Eigen::VectorXd lambdaOfx(nel);
+    Eigen::VectorXd muOfx(nel);
+    for (int i = 0; i < nel; i++) {
+        if (x(i) == 1) {
+            lambdaOfx(i) = lambda[0];
+            muOfx(i) = mu[0];
+        }
+        else if (x(i) == 2) {
+            lambdaOfx(i) = lambda[1];
+            muOfx(i) = mu[1];
+        }
+    }
+    // The corresponding stiffness matrix entries
+    Eigen::VectorXd keLambdaVector(keLambda.rows() * keLambda.cols());
+    Eigen::VectorXd keMuVector(keMu.rows() * keMu.cols());
+    int indexOfkeLambdaVector = 0;
+    for (int i = 0; i < keLambda.cols(); i++) {
+        for (int j = 0; j < keLambda.rows(); j++) {
+            keLambdaVector(indexOfkeLambdaVector++) = keLambda(j, i);
+        }
+    }
+    int indexOfkeMuVector = 0;
+    for (int i = 0; i < keMu.cols(); i++) {
+        for (int j = 0; j < keMu.rows(); j++) {
+            keMuVector(indexOfkeMuVector++) = keMu(j, i);
+        }
+    }
+    Eigen::MatrixXd sK = (keLambdaVector * lambdaOfx.transpose() + keMuVector * muOfx.transpose());
+
+    //std::cout << "sK:\n" << sK << "++++++++++++++++++++++\n";
+
+    //std::cout << iK.rows() * iK.cols() << "   ===    " << jK.rows() * jK.cols() << "  ===  " << sK.rows() * sK.cols() << '\n';
+    //Map<RowVectorXf> v1(M1.data(), M1.size());
+    //cout << "v1:" << endl << v1 << endl;
+
+    //Matrix<float, Dynamic, Dynamic, RowMajor> M2(M1);
+    //Map<RowVectorXf> v2(M2.data(), M2.size());
+    //cout << "v2:" << endl << v2 << endl;
+
+    Map<VectorXi> iKVector(iK.data(), iK.size());
+    Map<VectorXi> jKVector(jK.data(), jK.size());
+    Map<VectorXd> sKVector(sK.data(), sK.size());
+
+    Eigen::SparseMatrix<double> K = Eigen::SparseMatrix<double>(ndof, ndof);
+    //// Fill K with triplets
+    std::vector<Eigen::Triplet<double>> triplets;
+    for (int i = 0; i < iK.size(); ++i) {
+        triplets.emplace_back(iKVector(i) - 1, jKVector(i) - 1, sKVector(i));
+    }
+    K.setFromTriplets(triplets.begin(), triplets.end());
+
+    //--------------------------Test----------------------------------------
+    //----------------------------------------------------------------------
+
+    //std::cout << "K:\n" << MatrixXd(K) << "++++++++++++++++++++++\n";
+
+    //----------------------------------------------------------------------
+    //----------------------------------------------------------------------
+    //LOAD VECTORS AND SOLUTION
+    Eigen::VectorXd feLambdaVector(feLambda.rows() * feLambda.cols());
+    Eigen::VectorXd feMuVector(feMu.rows() * feMu.cols());
+    int indexOffeLambdaVector = 0;
+    for (int i = 0; i < feLambda.cols(); i++) {
+        for (int j = 0; j < feLambda.rows(); j++) {
+            feLambdaVector(indexOffeLambdaVector++) = feLambda(j, i);
+        }
+    }
+    int indexOffeMuVector = 0;
+    for (int i = 0; i < feMu.cols(); i++) {
+        for (int j = 0; j < feMu.rows(); j++) {
+            feMuVector(indexOffeMuVector++) = feMu(j, i);
+        }
+    }
+
+    Eigen::MatrixXd sF = (feLambdaVector * lambdaOfx.transpose() + feMuVector * muOfx.transpose());
+    //std::cout << "feLambdaVector:\n" << feLambdaVector << "++++++++++++++++++++++\n";
+    //std::cout << "feMuVector:\n" << feMuVector << "++++++++++++++++++++++\n";
+    //std::cout << "sF:\n" << sF << "++++++++++++++++++++++\n";
+
+    //			//nel * 8
+    Eigen::MatrixXi iF(24, nel);
+    Eigen::MatrixXi edofMatT = edofMat.transpose();
+    iF.block(0, 0, edofMatT.rows(), edofMatT.cols()) = edofMatT;
+    iF.block(edofMatT.rows(), 0, edofMatT.rows(), edofMatT.cols()) = edofMatT;
+    iF.block(edofMatT.rows() * 2, 0, edofMatT.rows(), edofMatT.cols()) = edofMatT;
+
+    Eigen::MatrixXi jF(24, nel);
+    Eigen::MatrixXi jFzeros = Eigen::MatrixXi::Ones(8, nel);
+    jF.block(0, 0, jFzeros.rows(), jFzeros.cols()) = jFzeros;
+    jF.block(jFzeros.rows(), 0, jFzeros.rows(), jFzeros.cols()) = jFzeros * 2;
+    jF.block(jFzeros.rows() * 2, 0, jFzeros.rows(), jFzeros.cols()) = jFzeros * 3;
+
+    Map<VectorXi> iFVector(iF.data(), iF.size());
+    Map<VectorXi> jFVector(jF.data(), jF.size());
+    Map<VectorXd> sFVector(sF.data(), sF.size());
+
+    Eigen::SparseMatrix<double> F(ndof, 3);
+
+    std::vector<Eigen::Triplet<double>> triplets2;
+    for (int i = 0; i < iF.size(); ++i) {
+        triplets2.emplace_back(iFVector(i) - 1, jFVector(i) - 1, sFVector(i));
+    }
+    F.setFromTriplets(triplets2.begin(), triplets2.end());
+    //showSparseMatrix(F.block(0,0,100,3));
+    //chi(3:2:ndof,:) = K(3:2:end,3:2:end)\[F(3:2:end,1) F(4:2:end,2)];
+    // ç”Ÿæˆå­çŸ©é˜µçš„è¡Œç´¢å¼• (MATLAB: 3:2:end â†’ C++ç´¢å¼• 2,4,6...)
+    std::vector<int> sub_rows;
+    for (int i = 2; i < ndof; i += 2) {
+        sub_rows.push_back(i);
+    }
+    // æå– K çš„æ•°æ®
+    int sub_size = sub_rows.size();
+    Eigen::SparseMatrix<double> K_3_2_end(sub_size, sub_size); // å­çŸ©é˜µå¤§å°
+    std::vector<Eigen::Triplet<double>> K_sub_triplets;
+
+    // éå† K ä¸­æ‰€æœ‰éé›¶å…ƒç´ ï¼Œç­›é€‰æ»¡è¶³è¡Œåˆ—éƒ½åœ¨ sub_indices ä¸­çš„å…ƒç´ 
+    for (int k = 0; k < K.outerSize(); ++k) {
+        for (Eigen::SparseMatrix<double>::InnerIterator it(K, k); it; ++it) {
+            int row = it.row();
+            int col = it.col();
+
+            // åˆ¤æ–­ row å’Œ col æ˜¯å¦éƒ½åœ¨ sub_indices ä¸­
+            auto it_row = std::find(sub_rows.begin(), sub_rows.end(), row);
+            auto it_col = std::find(sub_rows.begin(), sub_rows.end(), col);
+
+            if (it_row != sub_rows.end() && it_col != sub_rows.end()) {
+                int new_row = std::distance(sub_rows.begin(), it_row);
+                int new_col = std::distance(sub_rows.begin(), it_col);
+                K_sub_triplets.emplace_back(new_row, new_col, it.value());
+            }
+        }
+    }
+    K_3_2_end.setFromTriplets(K_sub_triplets.begin(), K_sub_triplets.end());
+    
+    // æå– F(3:2:end, 1) => F(2,0), F(4,0), ...  æå– F(4:2:end, 2) => F(3,1), F(5,1), ...
+    std::vector<Eigen::Triplet<double>> F_sub_triplets;
+    int row_sub = 0;
+
+    // ç¬¬1åˆ—ï¼šF(3:2:end,1) â‡’ ç´¢å¼• 2,4,6,...
+    for (int i = 2; i < ndof; i += 2) {
+        double val = F.coeff(i, 0);
+        if (val != 0.0) {
+            F_sub_triplets.emplace_back(row_sub, 0, val);
+        }
+        ++row_sub;
+    }
+    int len1 = row_sub;
+    row_sub = 0;
+    // ç¬¬2åˆ—ï¼šF(4:2:end,2) â‡’ ç´¢å¼• 3,5,7,...
+    for (int i = 3; i < ndof; i += 2) {
+        double val = F.coeff(i, 1);
+        if (val != 0.0) {
+            F_sub_triplets.emplace_back(row_sub, 1, val);
+        }
+        ++row_sub;
+    }
+    assert(len1 == row_sub);
+
+    // æ„å»ºæœ€ç»ˆç¨€ç–çŸ©é˜µ F_subï¼ˆmax_row x 2ï¼‰
+    Eigen::SparseMatrix<double> F_sub(len1, 2);
+    F_sub.setFromTriplets(F_sub_triplets.begin(), F_sub_triplets.end());
+    
+    SparseLU<SparseMatrix<double>> solver;
+    //solver.compute(K.transpose().block(2, 2,  ndof - 2, ndof - 2)); // æ±‚è§£Kä¸­3åˆ°ndofçš„éƒ¨åˆ†ï¼Œæ³¨æ„è¦å»é™¤è¾¹ç•Œä¸Šçš„è‡ªç”±åº¦
+    solver.compute(K_3_2_end); // æ±‚è§£K_3_2_end
+    
+    //chi = solver.solve(F_sub); // æ±‚è§£çº¿æ€§æ–¹ç¨‹ç»„
+    //cout << "chi computed!" << endl;
+    Eigen::SparseMatrix<double>  X1 = solver.solve(F_sub); // æ±‚è§£çº¿æ€§æ–¹ç¨‹ç»„
+    //showSparseMatrix(X1);
+
+    // å°†è§£ç»“æœå¡«å……åˆ° chi çš„ç¨€ç–çŸ©é˜µä¸­ï¼ˆä»…éé›¶å€¼ï¼‰
+    std::vector<int> target_rows;
+    for (int i = 2; i < ndof; i += 2) { // MATLAB 3:2:ndof == C++ 2,4,6,...
+        target_rows.push_back(i);
+    }
+
+    Eigen::SparseMatrix<double> chi(ndof, 2);
+    int num_target_rows = target_rows.size();
+    // å°† X1 çš„æ¯ä¸ªéé›¶å…ƒç´ èµ‹å€¼åˆ° chi çš„å¯¹åº”å¥‡æ•°è¡Œï¼ˆä»ç¬¬3è¡Œèµ·ï¼‰
+    for (int k = 0; k < X1.outerSize(); ++k) {
+        for (SparseMatrix<double>::InnerIterator it(X1, k); it; ++it) {
+            int row_in_X1 = it.row(); // è¡Œå· in X1
+            int col = it.col();
+            int row_in_chi = target_rows[row_in_X1];
+            chi.coeffRef(row_in_chi, col) = it.value();
+        }
+    }
+    cout << "chi computed!" <<endl;
+    //showSparseMatrix(chi);
+
+//HOMOGENIZATION
+//æ³¨æ„é—®é¢˜  matlabçš„ä¸‹æ ‡å¯èƒ½ä¸Eigenä¸åŒ
+
+    Eigen::MatrixXd chi0[3];
+    chi0[0] = Eigen::MatrixXd(nel, 8);
+    chi0[0].setZero();
+    chi0[1] = Eigen::MatrixXd(nel, 8);
+    chi0[1].setZero();
+    chi0[2] = Eigen::MatrixXd(nel, 8);
+    chi0[2].setZero();
+
+    Eigen::MatrixXd chi0_e = Eigen::MatrixXd(8, 3);
+    chi0_e.setZero();
+   /* Eigen::MatrixXd ke = keMu + keLambda;
+    Eigen::MatrixXd fe = feMu + feLambda;*/
+
+    //chi0_e(3:2:end,1:2) = keMu(3:2:end,3:2:end)\[feMu(3:2:end,1) feMu(4:2:end,2)];
+    std::vector<int> kemu_rows_cols; // kemuç›®æ ‡è¡Œåˆ—ç´¢å¼• 
+    std::vector<int> kemu_rows_cols2; // kemuç›®æ ‡è¡Œåˆ—ç´¢å¼• 
+    for (int i = 2; i < keMu.rows(); i += 2) {
+        kemu_rows_cols.push_back(i);
+    }
+
+    for (int i = 2; i < keMu.cols(); i += 2) {
+        kemu_rows_cols2.push_back(i);
+    }
+    //keMu(3:2:end,3:2:end)
+    MatrixXd keMu3_2_end_3_2_end(kemu_rows_cols.size(), kemu_rows_cols.size());
+    for (int i = 0; i < keMu3_2_end_3_2_end.rows(); i++) {
+        for (int j = 0; j < keMu3_2_end_3_2_end.cols(); j++) {
+            keMu3_2_end_3_2_end(i, j) = keMu(kemu_rows_cols[i], kemu_rows_cols[j]);
+        }
+    }
+   // cout << "keMu3_2_end_3_2_end: " << keMu3_2_end_3_2_end << endl;
+    //[F(3:2:end,1) F(4:2:end,2)]
+    std::vector<int> femu_rows1; // feMuå¥‡æ•°è¡Œç¬¬ä¸€åˆ—è¡Œåˆ—ç´¢å¼• 
+    std::vector<int> femu_rows2; // feMuå¶æ•°è¡Œç¬¬äºŒåˆ—è¡Œåˆ—ç´¢å¼• 
+    for (int i = 2; i < feMu.rows(); i += 2) {
+        femu_rows1.push_back(i);
+    }
+    for (int i = 3; i < feMu.rows(); i += 2) {
+        femu_rows2.push_back(i);
+    }
+    assert(femu_rows1.size() == femu_rows2.size());
+
+    MatrixXd Femu_sub(femu_rows1.size(), 2);
+    for (int i = 0; i < femu_rows1.size(); i++) {
+        Femu_sub(i, 0) = feMu(femu_rows1[i], 0); // ç¬¬ä¸€åˆ—
+        Femu_sub(i, 1) = feMu(femu_rows2[i], 1); // ç¬¬äºŒåˆ—
+    }
+    // chi0_e(3:2:end,1:2)
+    Eigen::FullPivLU<Eigen::MatrixXd> lu_solver;
+    lu_solver.compute(keMu3_2_end_3_2_end);
+    Eigen::MatrixXd X2 = lu_solver.solve(Femu_sub);
+    cout << X2 << endl;
+    // ===================================================================
+    for (int i = 0; i < kemu_rows_cols.size(); ++i) {
+        const int row = kemu_rows_cols[i];
+        chi0_e(row, 0) = X2(i, 0);  // ç¬¬ä¸€åˆ—
+        chi0_e(row, 1) = X2(i, 1);  // ç¬¬äºŒåˆ—
+    }
+
+    //std::cout << "chi0_e\n" << chi0_e << "++++++++++++++++++++++\n";
+
+    VectorXd chi0_e_1 = chi0_e.col(0);
+    VectorXd chi0_e_2 = chi0_e.col(1);
+    VectorXd chi0_e_3 = chi0_e.col(2);
+
+    VectorXd epsilonones = VectorXd::Ones(nel);
+
+    chi0[0] = Eigen::kroneckerProduct(chi0_e_1.transpose(), epsilonones);
+    chi0[1] = Eigen::kroneckerProduct(chi0_e_2.transpose(), epsilonones);
+    chi0[2] = Eigen::kroneckerProduct(chi0_e_3.transpose(), epsilonones);
+
+    //std::cout << "chi0[0]:\n" << chi0[0] << "++++++++++++++++++++++\n";
+    //std::cout << "chi0[1]:\n" << chi0[1] << "++++++++++++++++++++++\n";
+    //std::cout << "chi0[2]:\n" << chi0[2] << "++++++++++++++++++++++\n";
+
+    //std::cout << "chi0_e1:\n" << chi0_e_1 << "++++++++++++++++++++++\n";
+    //std::cout << "chi0_e2:\n" << chi0_e_2 << "++++++++++++++++++++++\n";
+    //std::cout << "chi0_e3:\n" << chi0_e_3 << "++++++++++++++++++++++\n";
+
+    Eigen::MatrixXd CH = Eigen::MatrixXd::Zero(3, 3);
+    double cellVolume = lx * ly;
+    Eigen::MatrixXd chiMatrix(chi);
+    Map<VectorXd> chiVector(chiMatrix.data(), chiMatrix.size());
+
+    for (int i = 0; i < 2; i++) {
+        for (int j = 0; j < 2; j++) {
+            Eigen::MatrixXd chiP1(edofMat.rows(), edofMat.cols());
+            Eigen::MatrixXd chiP2(edofMat.rows(), edofMat.cols());
+            for (int indexx = 0; indexx < chiP1.rows(); indexx++) {
+                for (int indexy = 0; indexy < chiP1.cols(); indexy++) {
+                    chiP1(indexx, indexy) = chiVector(edofMat(indexx, indexy) + i * ndof - 1);
+                    chiP2(indexx, indexy) = chiVector(edofMat(indexx, indexy) + j * ndof - 1);
+                }
+            }
+            
+           /* for (int indexx = 0; indexx < chiP1.rows(); indexx++) {
+                for (int indexy = 0; indexy < chiP1.cols(); indexy++) {
+                    chiP2(indexx, indexy) = chiVector(edofMat(indexx, indexy) + j * ndof - 1);
+                }
+            }*/
+
+            //std::cout << "chiP1:\n" << chiP1 << "++++++++++++++++++++++\n";
+            //std::cout << "Chi0:\n" << chi0[i] << "++++++++++++++++++++++\n";
+            //std::cout << "keLambda:\n" << keLambda << "++++++++++++++++++++++\n";
+            
+            MatrixXd sumLambdaMult1 = (chi0[i] - chiP1) * keLambda;
+            MatrixXd sumLambdaMult2 = chi0[j] - chiP2;
+            //std::cout << "sumLambdaMult1:\n" << sumLambdaMult1 << "++++++++++++++++++++++\n";
+            //std::cout << "sumLambdaMult2:\n" << sumLambdaMult2 << "++++++++++++++++++++++\n";
+
+            MatrixXd sumLambdaT = ((sumLambdaMult1).cwiseProduct(sumLambdaMult2));
+            MatrixXd sumMuT = (((chi0[i] - chiP1) * keMu).cwiseProduct(chi0[j] - chiP2));
+            //std::cout << "sumLambdaT:\n" << sumLambdaT << "++++++++++++++++++++++\n";
+
+            VectorXd sumLambdaRowsum = sumLambdaT.rowwise().sum();
+            VectorXd sumMuRowsum = sumMuT.rowwise().sum();
+
+
+            MatrixXd sumLambda = Map<MatrixXd>(sumLambdaRowsum.data(), nely, nelx);
+            MatrixXd sumMu = Map<MatrixXd>(sumMuRowsum.data(), nely, nelx);
+
+            MatrixXd LambdaMatrix = Map<MatrixXd>(lambdaOfx.data(), nely, nelx);
+            MatrixXd MuMatrix = Map<MatrixXd>(muOfx.data(), nely, nelx);
+
+            //std::cout << "sumLambda:\n" << sumLambda << "++++++++++++++++++++++\n";
+            //std::cout << "sumMu:\n" << sumMu << "++++++++++++++++++++++\n";
+            /*std::cout << "LambdaMatrix:\n" << LambdaMatrix << "++++++++++++++++++++++\n";
+            std::cout << "MuMatrix:\n" << MuMatrix << "++++++++++++++++++++++\n";*/
+
+            //std::cout << "LambdaVec.*sumLambda:\n" << LambdaMatrix.cwiseProduct(sumLambda) << "+++++++++++++++++++\n";
+            //std::cout << "MuVec.*sumMu:\n" << MuMatrix.cwiseProduct(sumMu) << "+++++++++++++++++++\n";
+            CH(i, j) = 1.0 / cellVolume
+                * (LambdaMatrix.cwiseProduct(sumLambda) + MuMatrix.cwiseProduct(sumMu)).sum();
+        }
+    }
+    
+    std::cout << "CH:\n" << CH << "++++++++++++++++++++++\n";
+    Eigen::MatrixXd Kappa_H = CH.block(0, 0, 2, 2);
+    return Kappa_H;
+}
+
+void elementMatVec_therm(double a,
+    double b,
+    double phi,
+    MatrixXd& keLambda,
+    MatrixXd& keMu,
+    MatrixXd& feLambda,
+    MatrixXd& feMu)
+{
+    // Constitutive matrix contributions
+    Matrix3d CMu = Matrix3d::Zero();
+    CMu.diagonal() << 1, 1, 0;
+    Matrix3d CLambda = Matrix3d::Zero();
+
+
+    // Two Gauss points in both directions
+    double xx[2] = { -1.0 / sqrt(3.0), 1.0 / sqrt(3.0) };
+    double yy[2] = { -1.0 / sqrt(3.0), 1.0 / sqrt(3.0) };
+    double ww[2] = { 1.0, 1.0 };
+
+    // Initialize
+    keLambda = MatrixXd::Zero(8, 8);
+    keMu = MatrixXd::Zero(8, 8);
+    feLambda = MatrixXd::Zero(8, 3);
+    feMu = MatrixXd::Zero(8, 3);
+
+    Matrix<double, 3, 4> L;
+    L << 1, 0, 0, 0, 0, 0, 0, 1, 0, 1, 1, 0;
+
+    for (int ii = 0; ii < 2; ii++) {
+        for (int jj = 0; jj < 2; jj++) {
+            // Integration point
+            double x = xx[ii];
+            double y = yy[jj];
+
+            // Differentiated shape functions
+            VectorXd dNx(4), dNy(4);
+            dNx << -(1 - y), 1 - y, 1 + y, -(1 + y);
+            dNy << -(1 - x), -(1 + x), 1 + x, 1 - x;
+            dNx /= 4.0;
+            dNy /= 4.0;
+
+            //std::cout << dNx << '\n';
+            //std::cout << dNy << '\n';
+
+            // Jacobian
+            MatrixXd dN_t(2, 4);
+            dN_t.row(0) = dNx;
+            dN_t.row(1) = dNy;
+
+            MatrixXd dN_tt(4, 2);
+            VectorXd vec1(4), vec2(4);
+            vec1 << -a, a, a + 2 * b / tan(phi * M_PI / 180), 2 * b / tan(phi * M_PI / 180) - a;
+            vec2 << -b, -b, b, b;
+            dN_tt.col(0) = vec1;
+            dN_tt.col(1) = vec2;
+
+            //std::cout << "dN_t:::\n" << dN_t << '\n';
+            //std::cout << "dN_tt:::\n" << dN_tt << '\n';
+
+            Matrix2d J = dN_t * dN_tt;
+            //J.row(0) << dN_t.row(0) * Matrix<double, 4, 1>(-a, a, a + 2 * b / tan(phi * M_PI / 180), 2 * b / tan(phi * M_PI / 180) - a);
+            //J.row(1) << dN_t.row(1) * Matrix<double, 4, 1>(-b, -b, b, b);
+
+            //std::cout << "J:::\n" << J << '\n';
+
+            double detJ = J.determinant();
+            Matrix2d invJ;
+            invJ << J(1, 1), -J(0, 1), -J(1, 0), J(0, 0);
+            invJ *= 1.0 / detJ;
+
+            // Weight factor at this point
+            double weight = ww[ii] * ww[jj] * detJ;
+
+            // Strain-displacement matrix
+            MatrixXd G(4, 4);
+            G.setZero();
+            G.block<2, 2>(0, 0) = invJ;
+            G.block<2, 2>(2, 2) = invJ;
+            MatrixXd dN = Matrix<double, 4, 8>::Zero();
+            for (int indexOfdN = 0; indexOfdN < 4; indexOfdN++) {
+                dN(0, indexOfdN * 2) = dNx(indexOfdN);
+                dN(1, indexOfdN * 2) = dNy(indexOfdN);
+                dN(2, indexOfdN * 2 + 1) = dNx(indexOfdN);
+                dN(3, indexOfdN * 2 + 1) = dNy(indexOfdN);
+            }
+
+            MatrixXd B = L * G * dN;
+            //std::cout << "G:::\n" << G << '\n';
+            //std::cout << "dN:::\n" << dN << '\n';
+            //std::cout << "B:::\n" << B << '\n';
+
+            // Element matrices
+            keLambda += weight * (B.transpose() * CLambda * B);
+            keMu += weight * (B.transpose() * CMu * B);
+            // Element loads
+            feLambda += weight * (B.transpose() * CLambda * MatrixXd::Identity(3, 3));
+            feMu += weight * (B.transpose() * CMu * MatrixXd::Identity(3, 3));
+
+            //std::cout << keLambda << '\n';
+        }
+    }
+}
+
+
+void showSparseMatrix(SparseMatrix<double> X)
+{
+    cout << X.rows() << "x" << X.cols() << endl;
+    for (int k = 0; k < X.outerSize(); ++k) {
+        for (SparseMatrix<double>::InnerIterator it(X, k); it; ++it) {
+            std::cout << "(" << it.row() + 1 << ", " << it.col() + 1 << ") "
+                << it.value() << std::endl;
+        }
+    }
+}
 
