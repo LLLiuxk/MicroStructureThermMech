@@ -119,18 +119,6 @@ MatrixXd homogenize(
             edofMatNew(i, j) = dofVector(edofMat(i, j) - 1);
     edofMat = edofMatNew;
     int ndof = 2 * nnP; // Number of dofs
-//
-//    //--------------------------Test----------------------------------------
-//    //std::cout << "nnPArray:\n" << nnPArray << "++++++++++++++++++++++\n";
-//    //std::cout << "nnParrayVector:\n" << nnParrayVector << "++++++++++++++++++++++\n";
-//    //std::cout << "dofVector:\n" << dofVector << "++++++++++++++++++++++\n";
-//    //std::cout << "edofMat:\n" << edofMat << "++++++++++++++++++++++\n";
-//    //std::cout << "feMu:\n" << feMu << "++++++++++++++++++++++\n";
-//    //std::cout << "nodenrs:\n" << nodenrs << "++++++++++++++++++++++\n";
-//    //std::cout << "edofVec:\n" << edofVec << "++++++++++++++++++++++\n";
-//    //std::cout << "edofMat:\n" << edofMat << "++++++++++++++++++++++\n";
-//    //----------------------------------------------------------------------
-//
 //    // ASSEMBLE STIFFNESS MATRIX
 //    // Indexing vectors
 
@@ -992,7 +980,7 @@ MatrixXd homogenize_therm(
         }
     }
     
-    std::cout << "CH:\n" << CH << "++++++++++++++++++++++\n";
+    std::cout << "CH:\n" << CH <<endl<< "++++++++++++++++++++++\n";
     Eigen::MatrixXd Kappa_H = CH.block(0, 0, 2, 2);
     return Kappa_H;
 }
@@ -1111,4 +1099,261 @@ void showSparseMatrix(SparseMatrix<double> X)
         }
     }
 }
+
+
+//math tools
+double BSampleFunction::F03(double t)
+{
+    return 1.0 / 6 * (-t * t * t + 3 * t * t - 3 * t + 1);
+}
+double BSampleFunction::F13(double t)
+{
+    return 1.0 / 6 * (3 * t * t * t - 6 * t * t + 4);
+}
+double BSampleFunction::F23(double t)
+{
+    return 1.0 / 6 * (-3 * t * t * t + 3 * t * t + 3 * t + 1);
+}
+double BSampleFunction::F33(double t)
+{
+    return 1.0 / 6 * t * t * t;
+}
+
+std::vector<Eigen::Vector2d> BSampleFunction::ThreeOrderBSplineInterpolatePt(std::vector<Eigen::Vector2d>& pt, int InsertNum)
+{
+    if (pt.size() == 0 || InsertNum <= 0)
+        return std::vector<Eigen::Vector2d>();
+    int Num = pt.size();
+    int InsertNumSum = 0;
+    for (int i = 0; i < Num - 1; i++)
+        InsertNumSum += InsertNum;
+
+    std::vector<Eigen::Vector2d> temp(Num + 2);
+    for (int i = 0; i < Num; i++)
+        temp[i + 1] = pt[i];
+
+    temp[0] = Eigen::Vector2d(2 * temp[1].x() - temp[2].x(), 2 * temp[1].y() - temp[2].y());
+    temp[Num + 1] = Eigen::Vector2d(2 * temp[Num].x() - temp[Num - 1].x(),
+        2 * temp[Num].y() - temp[Num - 1].y());
+
+
+    Eigen::Vector2d NodePt1, NodePt2, NodePt3, NodePt4;
+    double t;
+    std::vector<Eigen::Vector2d> newpt(Num + InsertNumSum);
+
+    int totalnum = 0;
+    for (int i = 0; i < Num - 1; i++)
+    {
+        NodePt1 = temp[i];
+        NodePt2 = temp[i + 1];
+        NodePt3 = temp[i + 2];
+        NodePt4 = temp[i + 3];
+        double dt = 1.0 / (InsertNum + 1);
+
+        for (int j = 0; j < InsertNum + 1; j++) {
+            t = dt * j;
+            newpt[totalnum] = F03(t) * NodePt1 + F13(t) * NodePt2 + F23(t) * NodePt3
+                + F33(t) * NodePt4;
+            totalnum++;
+        }
+
+        if (i == Num - 2) {
+            t = 1;
+            newpt[totalnum] = F03(t) * NodePt1 + F13(t) * NodePt2 + F23(t) * NodePt3
+                + F33(t) * NodePt4;
+            totalnum++;
+        }
+    }
+
+    return newpt;
+
+    Num = Num + InsertNumSum;
+}
+
+HermitFunction::HermitFunction(const Eigen::MatrixXd& control_points, const Eigen::MatrixXd& tangents)
+    : m_P(control_points)
+    , m_T(tangents)
+{
+    assert(control_points.cols() == tangents.cols() && control_points.rows() == tangents.rows());
+}
+
+HermitFunction::HermitFunction(Eigen::Vector2d b, Eigen::Vector2d p0, Eigen::Vector2d e, Eigen::Vector2d p1)
+{
+    Eigen::MatrixXd P(2, 2);
+    P << b.x(), e.x(), b.y(), e.y();
+    m_P = P;
+
+    Eigen::MatrixXd T(2, 2);
+    T << p0.x(), p1.x(), p0.y(), p1.y();
+    m_T = T;
+}
+
+HermitFunction::HermitFunction(Eigen::Vector2d b, Eigen::Vector2d e, double angleb, double anglee)
+{
+    Eigen::MatrixXd P(2, 2);
+    P << b.x(), e.x(), b.y(), e.y();
+    m_P = P;
+
+    angleb = angleb / 180.0f * 3.1415926f;
+    anglee = anglee / 180.0f * 3.1415926f;
+    Eigen::Vector2d p0 = Eigen::Vector2d(std::cosf(angleb), std::sinf(angleb));
+
+    Eigen::Vector2d p1 = Eigen::Vector2d(std::cosf(anglee), std::sinf(anglee));
+    Eigen::MatrixXd T(2, 2);
+    T << p0.x(), p1.x(), p0.y(), p1.y();
+    m_T = T;
+}
+
+void HermitFunction::HermitFunction2(Eigen::Vector2d b, Eigen::Vector2d e, double angleb, double anglee)
+{
+    Eigen::MatrixXd P(2, 2);
+    P << b.x(), e.x(), b.y(), e.y();
+    m_P = P;
+
+    angleb = angleb / 180.0f * 3.1415926f;
+    anglee = anglee / 180.0f * 3.1415926f;
+    Eigen::Vector2d p0 = Eigen::Vector2d(std::cosf(angleb), std::sinf(angleb));
+
+    Eigen::Vector2d p1 = Eigen::Vector2d(std::cosf(anglee), std::sinf(anglee));
+    Eigen::MatrixXd T(2, 2);
+    T << p0.x(), p1.x(), p0.y(), p1.y();
+    m_T = T;
+}
+
+void HermitFunction::UsingpointWithtangent(Eigen::Vector2d b,
+    Eigen::Vector2d p0,
+    Eigen::Vector2d e,
+    Eigen::Vector2d p1)
+{
+    Eigen::MatrixXd P(2, 2);
+    P << b.x(), e.x(), b.y(), e.y();
+    m_P = P;
+
+    Eigen::MatrixXd T(2, 2);
+    T << p0.x(), p1.x(), p0.y(), p1.y();
+    m_T = T;
+}
+
+Eigen::Vector2d HermitFunction::getpoint(double t)
+{
+    int n = m_P.cols();
+    int i = int(t * (n - 1));
+    t = t * (n - 1) - i;
+
+    Eigen::Vector2d point_on_curve = (2 * t * t * t - 3 * t * t + 1) * m_P.col(i)
+        + (t * t * t - 2 * t * t + t) * m_T.col(i)
+        + (-2 * t * t * t + 3 * t * t) * m_P.col(i + 1)
+        + (t * t * t - t * t) * m_T.col(i + 1);
+
+    return point_on_curve;
+}
+
+Eigen::Vector2d HermitFunction::getderivation(double t) 
+{
+    int n = m_P.cols();
+    int i = int(t * (n - 1));
+    t = t * (n - 1) - i;
+
+    Eigen::Vector2d pointder_on_curve = (6 * t * t - 6 * t) * m_P.col(i)
+        + (3 * t * t - 4 * t + 1) * m_T.col(i)
+        + (-6 * t * t + 6 * t) * m_P.col(i + 1)
+        + (3 * t * t - 2 * t) * m_T.col(i + 1);
+
+    Eigen::Vector2d dP = 3 * (1 - t) * (1 - t) * (m_P.col(i + 1) - m_P.col(i))
+        + 6 * (1 - t) * t * (m_T.col(i + 1) - m_T.col(i))
+        + 3 * t * t * (m_P.col(i + 1) - m_P.col(i));
+
+    return dP;
+}
+
+Eigen::Vector2d HermitFunction::GetPoint(double t) 
+{
+    Eigen::Vector2d P0_ = m_P.col(0);
+    Eigen::Vector2d P1_ = m_P.col(1);
+
+    Eigen::Vector2d T0_ = m_T.col(0);
+    Eigen::Vector2d T1_ = m_T.col(1);
+    double t2 = t * t;
+    double t3 = t2 * t;
+    double h1 = 2 * t3 - 3 * t2 + 1;
+    double h2 = -2 * t3 + 3 * t2;
+    double h3 = t3 - 2 * t2 + t;
+    double h4 = t3 - t2;
+    return h1 * P0_ + h2 * P1_ + h3 * T0_ + h4 * T1_;
+}
+
+std::vector<Eigen::Vector2d> HermitFunction::getPointsvec(int Numpoints) 
+{
+    double dert = 1.0f / (double)(Numpoints - 1);
+    std::vector<Eigen::Vector2d> vec;
+    for (double t = 0; t <= 1; t += dert) {
+        Eigen::Vector2d point_on_curve = HermitFunction::getpoint(t);
+        vec.push_back(point_on_curve);
+    }
+    return vec;
+}
+
+std::vector<Eigen::Vector2d> HermitFunction::getPointsvec(std::vector<Eigen::Vector2d> points,
+    std::vector<Eigen::Vector2d> tangents,
+    int Numpoints)
+{
+    double dert = 1.0f / (double)(Numpoints);
+    std::vector<Eigen::Vector2d> vec;
+    for (int i = 0; i < points.size() - 1; i++) {
+        if (i % 2 == 0)
+            UsingpointWithtangent(points[i], tangents[i], points[i + 1], tangents[i + 1]);
+        else
+            UsingpointWithtangent(points[i], tangents[i], points[i + 1], tangents[i + 1]);
+
+        for (double t = 0; t <= 1; t += dert) {
+            Eigen::Vector2d point_on_curve = HermitFunction::getpoint(t);
+            vec.push_back(point_on_curve);
+        }
+    }
+
+    return vec;
+}
+
+double HermitFunction::distance(const Eigen::Vector2d& point) 
+{
+    Eigen::Vector2d P0_ = m_P.col(0);
+    Eigen::Vector2d P1_ = m_P.col(1);
+
+    Eigen::Vector2d T0_ = m_T.col(0);
+    Eigen::Vector2d T1_ = m_T.col(1);
+
+    double epsilon = 1e-4;
+    double t0 = 0;
+    double t1 = 1;
+    double t = 0.5;
+    Eigen::Vector2d P = GetPoint(t);
+    Eigen::Vector2d dP = 3 * (1 - t) * (1 - t) * (P1_ - P0_) + 6 * (1 - t) * t * (T1_ - T0_)
+        + 3 * t * t * (P1_ - P0_);
+    Eigen::Vector2d v = point - P;
+    double dist = v.norm();
+    while (dist > epsilon) {
+        double a = dP.dot(dP);
+        double b = 2 * v.dot(dP);
+        double c = v.dot(v);
+        double D = b * b - 4 * a * c;
+        double t2 = (-b + sqrt(D)) / (2 * a);
+        double t3 = (-b - sqrt(D)) / (2 * a);
+        if (t2 >= 0 && t2 <= 1) {
+            t = t2;
+        }
+        else if (t3 >= 0 && t3 <= 1) {
+            t = t3;
+        }
+        else {
+            t = (t2 + t3) / 2;
+        }
+        P = GetPoint(t);
+        dP = 3 * (1 - t) * (1 - t) * (P1_ - P0_) + 6 * (1 - t) * t * (T1_ - T0_)
+            + 3 * t * t * (P1_ - P0_);
+        v = point - P;
+        dist = v.norm();
+    }
+    return dist;
+}
+
 

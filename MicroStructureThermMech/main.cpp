@@ -14,7 +14,7 @@ int main()
     std::cout << std::fixed << std::setprecision(6);  // 固定小数，保留 4 位
     cv::utils::logging::setLogLevel(cv::utils::logging::LOG_LEVEL_WARNING);
 
-    std::string imagePath = "C:\\Users\\Liuxk\\Documents\\MATLAB\\input\\small.png";
+    std::string imagePath = "D:/VisualStudioProjects/MicroStructureThermMech/MicroStructureThermMech/input/therm0.png";
     Eigen::MatrixXi binaryMat = image2matrix(imagePath);
 
     // 验证输出（前5x5像素）
@@ -31,10 +31,10 @@ int main()
     std::vector<double> Lambda2 = { 0, 0 };
     std::vector<double> Mu2 = { 10, 1 };
     
-    MatrixXd CH = homogenize(binaryMat.rows(), binaryMat.cols(), Lambda, Mu, phi, binaryMat);
-    cout << CH << endl;
-    /*MatrixXd KH = homogenize_therm(binaryMat.rows(), binaryMat.cols(), Lambda2, Mu2, phi, binaryMat);
-    cout <<"KH:"<<endl<< KH << endl;*/
+    /*MatrixXd CH = homogenize(binaryMat.rows(), binaryMat.cols(), Lambda, Mu, phi, binaryMat);
+    cout << CH << endl;*/
+    MatrixXd KH = homogenize_therm(binaryMat.rows(), binaryMat.cols(), Lambda2, Mu2, phi, binaryMat);
+    cout <<"KH:"<<endl<< KH << endl;
 
     cv::waitKey(0);
     return 0;

@@ -104,7 +104,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>C:\local\opencv\build\include;C:\local\opencv\build\include\opencv;C:\local\opencv\build\include\opencv2;D:\libs\boost_1_80_0;D:\libs\eigen-3.4.0;D:\libs\opengl\include;D:\libs\libigl_v250\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\local\opencv\build\include;C:\local\opencv\build\include\opencv;C:\local\opencv\build\include\opencv2;D:\libs\boost_1_80_0;D:\libs\eigen-3.4.0;D:\libs\opengl\include;D:\libs\libigl_v250\include</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
